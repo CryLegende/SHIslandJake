@@ -1,0 +1,192 @@
+# ============================================================================
+#  SHIslandJake : Jake, le PNJ de chaque île
+# ============================================================================
+#
+#  Chaque île SuperiorSkyblock2 a son Jake, posé près du centre à la création
+#  de l'île. Un clic sur Jake (membre de l'île) lance la commande « clic ».
+#  Accroupi + clic : les paramètres de Jake, comme /jake.
+#
+#  Le plugin garde lui-même ses Jake (jakes.yml), FancyNpcs ne fait que les
+#  dessiner : ils n'apparaissent ni dans /npc list ni dans son npcs.yml, et ne
+#  sont créés que là où un joueur passe. L'hologramme au-dessus de Jake vient
+#  de FancyHolograms ; sans lui, la première ligne devient le nom du PNJ.
+#
+#  Au premier démarrage, les PNJ d'IslandNPC (plugins/IslandNPC/database.db)
+#  sont repris : position, type et visibilité de chaque île.
+#
+#  Commandes joueur (alias /jack, /islandnpc, /isnpc, et /is jake, /is npc)
+#    /jake                      ouvre les paramètres de Jake
+#    /jake deplacer             clic sur un bloc de son île pour y placer Jake
+#    /jake visibilite           cache ou montre Jake à tout le monde
+#    /jake type [type]          choisit le type de Jake (menu sans argument)
+#
+#  Commandes d'administration (console aussi)
+#    /shislandjake reload           recharge config.yml et messages.yml
+#    /shislandjake info [joueur]    nombre de Jake, ou le Jake de l'île du joueur
+#    /shislandjake delete [joueur]  retire le Jake de l'île où l'on se trouve (ou
+#                                   de l'île du joueur) ; il revient à sa place de
+#                                   départ au prochain /jake d'un membre
+#    /shislandjake import           reprend les PNJ d'IslandNPC des îles qui
+#                                   n'ont pas encore de Jake
+#
+#  Permissions
+#    shislandjake.use             /jake, menu, choix du type (tout le monde)
+#    shislandjake.deplacer        déplacer Jake (tout le monde)
+#    shislandjake.visibilite      cacher ou montrer Jake (tout le monde)
+#    shislandjake.type.<type>     types de Jake (voir « types », VIP)
+#    shislandjake.type.*          tous les types de la configuration par défaut
+#    shislandjake.bypass          cliquer sur le Jake de n'importe quelle île (op)
+#    shislandjake.admin           toutes les sous-commandes de /shislandjake (op)
+#    shislandjake.admin.<sous-commande>   reload, info, delete, import
+#
+#  Placeholders (île du joueur)
+#    %shislandjake_type%          type de Jake (VILLAGER, WITCH...)
+#    %shislandjake_type_nom%      nom du type (messages.yml, types)
+#    %shislandjake_nom%           nom de Jake selon son type (Jake, Jakie)
+#    %shislandjake_visible%       visible ou caché (messages.yml, placeholders)
+# ============================================================================
+
+jake:
+  # Type de Jake à la création d'une île ; doit figurer dans « types ».
+  type: VILLAGER
+  # Jake visible à la création d'une île.
+  visible: true
+  # Crée Jake à la création d'une île. Sinon, il apparaît au premier /jake.
+  creation-avec-ile: true
+  # Place de départ par rapport au centre de l'île (x, y, z) et orientation
+  # (yaw : 0 regarde vers le sud, 90 vers l'ouest, 180 vers le nord).
+  position:
+    x: 3.0
+    y: 0.0
+    z: 6.0
+    yaw: 180.0
+    pitch: 0.0
+
+affichage:
+  # Distance, en blocs, à laquelle un joueur voit Jake.
+  distance: 32
+  # Ticks entre deux vérifications des Jake proches de chaque joueur.
+  intervalle-ticks: 10
+  # Un Jake qu'aucun joueur n'a vu depuis ce nombre de minutes est oublié par
+  # FancyNpcs ; il est recréé au retour d'un joueur.
+  oubli-minutes: 10
+  # Jake tourne la tête vers les joueurs proches.
+  regarder-joueurs: false
+  # Distance, en blocs, à laquelle Jake regarde un joueur.
+  distance-regard: 6
+  # Contour lumineux autour de Jake, et sa couleur : BLACK, DARK_BLUE,
+  # DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY, DARK_GRAY, BLUE,
+  # GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE.
+  brillance: false
+  couleur-brillance: BLUE
+
+hologramme:
+  # Hologramme au-dessus de Jake (lignes dans messages.yml, hologramme).
+  active: true
+  # Orientation : CENTER (suit le regard), VERTICAL (tourne sur lui-même) ou FIXED.
+  orientation: CENTER
+  # Fond du texte : default (fond gris de Minecraft), transparent, ou #AARRGGBB.
+  fond: transparent
+  ombre-texte: true
+  # Hauteur, en blocs, du bas de l'hologramme au-dessus des pieds de Jake,
+  # pour un type absent de « types ».
+  hauteur: 2.1
+
+clic:
+  # Commande lancée par le joueur qui clique sur Jake. Vide = aucune.
+  commande: dm open island
+  # Le clic gauche compte aussi (les joueurs Bedrock tapent sur Jake).
+  clic-gauche: true
+  # Accroupi + clic : paramètres de Jake au lieu de la commande.
+  accroupi-ouvre-menu: true
+  # Les membres de l'île peuvent cliquer sur Jake, pas seulement le chef.
+  membres: true
+  # Délai minimal, en millisecondes, entre deux clics pris en compte.
+  delai-ms: 500
+
+deplacement:
+  # Secondes laissées au joueur pour cliquer sur le bloc où placer Jake.
+  # Jake se pose sur le bloc cliqué, sur l'île du joueur, et se tourne vers lui.
+  temps-secondes: 15
+
+# Sous-commandes de /is qui ouvrent les paramètres de Jake. Prises en compte au
+# démarrage seulement.
+sous-commandes-ile:
+  - jake
+  - npc
+
+# Types que les joueurs peuvent choisir, dans l'ordre du menu. Noms des types
+# Minecraft (VILLAGER, WITCH, IRON_GOLEM...) ; noms affichés dans messages.yml.
+#   icone       objet du menu
+#   hauteur     bas de l'hologramme au-dessus des pieds de Jake, en blocs
+#   permission  droit demandé pour choisir ce type ; vide = tout le monde
+types:
+  VILLAGER:
+    icone: VILLAGER_SPAWN_EGG
+    hauteur: 2.1
+    permission: shislandjake.type.villager
+  EVOKER:
+    icone: EVOKER_SPAWN_EGG
+    hauteur: 2.1
+    permission: shislandjake.type.evoker
+  PILLAGER:
+    icone: PILLAGER_SPAWN_EGG
+    hauteur: 2.1
+    permission: shislandjake.type.pillager
+  VINDICATOR:
+    icone: VINDICATOR_SPAWN_EGG
+    hauteur: 2.1
+    permission: shislandjake.type.vindicator
+  WANDERING_TRADER:
+    icone: WANDERING_TRADER_SPAWN_EGG
+    hauteur: 2.1
+    permission: shislandjake.type.wandering_trader
+  WITCH:
+    icone: WITCH_SPAWN_EGG
+    hauteur: 2.55
+    permission: shislandjake.type.witch
+
+menu:
+  # Paramètres de Jake : 3 lignes de 9 cases, numérotées de 0 à 26.
+  principal:
+    remplissage: BLACK_STAINED_GLASS_PANE
+    cases-grises:
+      - 10
+      - 12
+      - 14
+      - 16
+    materiau-gris: GRAY_STAINED_GLASS_PANE
+    type: 11
+    visibilite: 13
+    materiau-visible: LIME_DYE
+    materiau-cache: GRAY_DYE
+    position: 15
+    position-materiau: COMPASS
+    retour: 22
+    retour-materiau: PAPER
+    # Commande lancée par le joueur avec le bouton retour. Vide = pas de bouton.
+    retour-commande: dm open island
+  # Choix du type : les types prennent les cases dans l'ordre de « types ».
+  types:
+    remplissage: BLACK_STAINED_GLASS_PANE
+    cases:
+      - 10
+      - 11
+      - 12
+      - 14
+      - 15
+      - 16
+    retour: 22
+    retour-materiau: PAPER
+
+sons:
+  # Sons joués au joueur. Vide = aucun son. Noms des sons Minecraft
+  # (block.anvil.break, ui.toast.in...).
+  # Clic sur Jake, avec la commande « clic ».
+  clic: block.anvil.break
+  # Ouverture des paramètres de Jake.
+  menu: ui.toast.in
+  # Type choisi, Jake déplacé.
+  succes: entity.villager.yes
+  # Refus : type réservé, bloc hors de l'île, pas membre de l'île.
+  refus: entity.villager.no

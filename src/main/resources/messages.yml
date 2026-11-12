@@ -1,0 +1,148 @@
+# ============================================================================
+#  SHIslandJake : messages du chat, hologramme, menus et noms des types
+# ============================================================================
+#  Codes couleur & et &#RRGGBB acceptés. Format SkyHand pour le chat : préfixe
+#  de la couleur du type, texte en &7, mots importants dans la couleur du type.
+#    &a succès · &e information · &6 avertissement · &c erreur
+#  Un message vide n'est pas envoyé. {nom} = nom de Jake selon son type.
+# ============================================================================
+
+chat:
+  pas-d-ile: '&7&l« &c&lSH &8&l» &7Vous devez avoir une &cîle &7pour parler à Jake (&c/is&7).'
+  # Le Jake de l'île avait disparu : il revient à sa place de départ.
+  jake-revenu: '&7&l« &e&lSH &8&l» &e{nom} &7n''était plus sur votre île : il vient d''y &erevenir&7.'
+  pas-membre: '&7&l« &c&lSH &8&l» &7Vous devez faire partie de &ccette île &7pour parler à {nom}.'
+  visible: '&7&l« &a&lSH &8&l» &a{nom} &7est de nouveau &avisible&7.'
+  cache: '&7&l« &a&lSH &8&l» &a{nom} &7est maintenant &acaché &7à tout le monde.'
+  # {secondes} = temps laissé pour cliquer.
+  deplacement-debut: '&7&l« &e&lSH &8&l» &7Cliquez sur un &ebloc de votre île &7pour y placer &e{nom} &7(&e{secondes} s&7).'
+  deplacement-deja: '&7&l« &e&lSH &8&l» &7Cliquez sur un &ebloc de votre île &7pour y placer &e{nom}&7.'
+  deplace: '&7&l« &a&lSH &8&l» &a{nom} &7a été &adéplacé&7.'
+  deplacement-temps: '&7&l« &6&lSH &8&l» &7Déplacement de &6{nom} &7annulé : &6temps écoulé&7.'
+  deplacement-annule: '&7&l« &6&lSH &8&l» &7Déplacement de &6{nom} &7annulé.'
+  deplacement-hors-ile: '&7&l« &c&lSH &8&l» &7Ce bloc n''est pas sur &cvotre île&7.'
+  deplacement-place: '&7&l« &c&lSH &8&l» &7Il n''y a pas assez de &cplace &7au-dessus de ce bloc.'
+  # {type} = nom du type.
+  type-change: '&7&l« &a&lSH &8&l» &7Jake est maintenant &a{type}&7.'
+  type-deja: '&7&l« &e&lSH &8&l» &7Jake est déjà &e{type}&7.'
+  type-reserve: '&7&l« &c&lSH &8&l» &7Le type &c{type} &7est réservé aux grades &cVIP&7.'
+  type-inconnu: '&7&l« &c&lSH &8&l» &7Il n''existe pas de type &c{type}&7.'
+  sans-permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la &cpermission &7d''utiliser cette commande.'
+  joueurs-seulement: '&7&l« &c&lSH &8&l» &7Cette commande se lance &cen jeu&7.'
+  # {commandes} = sous-commandes permises, séparées par « | ».
+  utilisation: '&7&l« &e&lSH &8&l» &7Utilisation : &e/jake {commandes}'
+  utilisation-admin: '&7&l« &e&lSH &8&l» &7Utilisation : &e/shislandjake {commandes}'
+  recharge: '&7&l« &a&lSH &8&l» &7Configuration &arechargée&7.'
+  # {fichier} = fichier refusé ; l'ancienne configuration reste en place.
+  recharge-erreur: '&7&l« &c&lSH &8&l» &c{fichier} &7est invalide : l''ancienne configuration reste en place (voir la console).'
+  # {jakes} = Jake enregistrés, {caches} = Jake cachés, {dessines} = Jake que FancyNpcs dessine en ce moment.
+  info: '&7&l« &e&lSH &8&l» &e{jakes} Jake &7({caches} cachés), &e{dessines} &7dessinés en ce moment.'
+  # {joueur}, {type}, {monde}, {x}, {y}, {z}, {visible}.
+  info-joueur: '&7&l« &e&lSH &8&l» &7Jake de l''île de &e{joueur} &7: &e{type} &7en &e{monde} {x} {y} {z}&7, {visible}&7.'
+  info-sans-jake: '&7&l« &e&lSH &8&l» &7L''île de &e{joueur} &7n''a pas de Jake.'
+  joueur-sans-ile: '&7&l« &c&lSH &8&l» &c{joueur} &7n''a pas d''île.'
+  aucune-ile-ici: '&7&l« &c&lSH &8&l» &7Vous n''êtes sur &caucune île&7.'
+  supprime: '&7&l« &a&lSH &8&l» &7Jake de l''île &aretiré&7 ; il reviendra au prochain &a/jake &7d''un membre.'
+  # {importes} = Jake repris, {presents} = îles qui avaient déjà leur Jake.
+  import: '&7&l« &a&lSH &8&l» &7IslandNPC : &a{importes} Jake repris&7, {presents} îles avaient déjà le leur.'
+  import-absent: '&7&l« &c&lSH &8&l» &7Aucune base &cIslandNPC &7à reprendre (plugins/IslandNPC/database.db).'
+  import-erreur: '&7&l« &c&lSH &8&l» &7La base &cIslandNPC &7n''a pas pu être lue (voir la console).'
+
+# Noms des sous-commandes affichés dans les lignes d'utilisation.
+sous-commandes:
+  deplacer: deplacer
+  visibilite: visibilite
+  type: type
+
+# Texte de %shislandjake_visible%, et de {visible} dans info-joueur.
+placeholders:
+  visible: '&avisible'
+  cache: '&ccaché'
+
+# Lignes de l'hologramme au-dessus de Jake. {nom} = nom de Jake selon son type.
+hologramme:
+  - '&b&l{nom}'
+  - '&7(clic droit)'
+
+# Nom de chaque type dans les menus et les messages, et nom de Jake sous ce type.
+# Un type sans « jake » garde le nom par défaut.
+types:
+  defaut-jake: Jake
+  VILLAGER:
+    nom: Villageois
+  EVOKER:
+    nom: Évocateur
+  PILLAGER:
+    nom: Pillard
+  VINDICATOR:
+    nom: Vindicateur
+  WANDERING_TRADER:
+    nom: Marchand
+  WITCH:
+    nom: Sorcière
+    jake: Jakie
+
+menu:
+  principal:
+    titre: '&8&lMenu &8| Paramètres de {nom}'
+    type:
+      nom: '&dType de {nom}'
+      # {types} = une ligne par type (ligne, ligne-actuel), {reserve} = ligne
+      # « reserve » quand le joueur n'a accès à aucun autre type.
+      description:
+        - ''
+        - '&8&l« &fChanger le &dtype de mob &fde {nom} &8&l»'
+        - ''
+        - '&7Type actuel :'
+        - '{types}'
+        - '{reserve}'
+        - '&8&o(( &d&oCliquez pour modifier &8&o))'
+      ligne: '&8• &7{type}'
+      ligne-actuel: '&8• &d{type}'
+      reserve: '&7VIP/VIP+/VIPElite seulement'
+    visibilite:
+      nom: '&aVisibilité de {nom}'
+      # {etat} = etat-visible ou etat-cache.
+      description:
+        - ''
+        - '&8&l« &fChanger la &avisibilité &fde {nom} &8&l»'
+        - ''
+        - '&7État actuel : {etat}'
+        - ''
+        - '&8&o(( &a&oCliquez pour modifier &8&o))'
+      etat-visible: '&avisible'
+      etat-cache: '&ccaché'
+    position:
+      nom: '&6Position de {nom}'
+      description:
+        - ''
+        - '&8&l« &fDéplacer la &6position &fde {nom} &8&l»'
+        - ''
+        - '&7Puis cliquez sur un bloc de votre île.'
+        - ''
+        - '&8&o(( &6&oCliquez pour modifier &8&o))'
+    retour:
+      nom: '&c⤾ Retour &7(clic)'
+  types:
+    titre: '&8&lMenu &8| Type de {nom}'
+    # {type} = nom du type, {jake} = nom de Jake sous ce type.
+    type:
+      nom: '&d{type}'
+      actuel:
+        - ''
+        - '&a✔ Type actuel de {jake}'
+      disponible:
+        - ''
+        - '&7Jake devient &d{jake}&7.'
+        - ''
+        - '&8&o(( &d&oCliquez pour choisir &8&o))'
+      reserve:
+        - ''
+        - '&c✖ Réservé aux grades VIP'
+        - '&7VIP/VIP+/VIPElite seulement'
+    retour:
+      nom: '&c⤾ Retour &7(clic)'
+
+# Aide de /is pour la sous-commande « jake ».
+sous-commande-ile:
+  description: Ouvrir les paramètres de Jake, le PNJ de votre île.

@@ -1,0 +1,87 @@
+name: SHIslandJake
+version: '${project.version}'
+main: org.Cry_Legende.sHIslandJake.SHIslandJake
+api-version: '1.21'
+author: Cry_Legende
+description: Jake, le PNJ de chaque île SuperiorSkyblock2, dessiné par FancyNpcs.
+depend:
+  - SuperiorSkyblock2
+  - FancyNpcs
+softdepend:
+  - FancyHolograms
+  - PlaceholderAPI
+
+commands:
+  jake:
+    description: Paramètres de Jake, le PNJ de votre île.
+    usage: /<command> [deplacer|visibilite|type]
+    aliases:
+      - jack
+      - islandnpc
+      - isnpc
+  shislandjake:
+    description: Administration de SHIslandJake.
+    usage: /<command> <reload|info|delete|import>
+
+permissions:
+  shislandjake.use:
+    description: Ouvrir les paramètres de Jake (/jake, /is jake) et choisir son type.
+    default: true
+  shislandjake.deplacer:
+    description: Déplacer Jake sur son île (/jake deplacer).
+    default: true
+  shislandjake.visibilite:
+    description: Cacher ou montrer Jake (/jake visibilite).
+    default: true
+  shislandjake.type.*:
+    description: Tous les types de Jake de la configuration par défaut.
+    default: false
+    children:
+      shislandjake.type.villager: true
+      shislandjake.type.evoker: true
+      shislandjake.type.pillager: true
+      shislandjake.type.vindicator: true
+      shislandjake.type.wandering_trader: true
+      shislandjake.type.witch: true
+  shislandjake.type.villager:
+    description: Jake en villageois.
+    default: false
+  shislandjake.type.evoker:
+    description: Jake en évocateur.
+    default: false
+  shislandjake.type.pillager:
+    description: Jake en pillard.
+    default: false
+  shislandjake.type.vindicator:
+    description: Jake en vindicateur.
+    default: false
+  shislandjake.type.wandering_trader:
+    description: Jake en marchand ambulant.
+    default: false
+  shislandjake.type.witch:
+    description: Jake en sorcière (Jakie).
+    default: false
+  shislandjake.bypass:
+    description: Cliquer sur le Jake de n'importe quelle île.
+    default: op
+  shislandjake.admin:
+    description: Toutes les sous-commandes de /shislandjake.
+    default: op
+    children:
+      shislandjake.admin.reload: true
+      shislandjake.admin.info: true
+      shislandjake.admin.delete: true
+      shislandjake.admin.import: true
+      shislandjake.bypass: true
+  shislandjake.admin.reload:
+    description: Recharger config.yml et messages.yml (/shislandjake reload).
+    default: op
+  shislandjake.admin.info:
+    description: Nombre de Jake, ou le Jake de l'île d'un joueur (/shislandjake info [joueur]).
+    default: op
+  shislandjake.admin.delete:
+    description: Retirer le Jake d'une île ; il revient à sa place de départ au prochain /jake (/shislandjake delete [joueur]).
+    default: op
+  shislandjake.admin.import:
+    description: Reprendre les PNJ d'IslandNPC des îles qui n'ont pas encore de Jake (/shislandjake import).
+    default: op
