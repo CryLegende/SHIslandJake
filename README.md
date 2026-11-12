@@ -49,7 +49,7 @@ Facultatives : `FancyHolograms` (hologramme au-dessus de Jake ; sans lui, la pre
 | `/shislandjake delete [joueur]` | `shislandjake.admin.delete` | Retire le Jake de l'île où l'on est (ou d'un joueur) ; il revient au prochain `/jake` |
 | `/shislandjake import` | `shislandjake.admin.import` | Reprend les PNJ d'IslandNPC des îles sans Jake |
 
-`shislandjake.admin` donne toutes les sous-commandes de `/shislandjake` et `shislandjake.bypass` (cliquer sur le Jake de n'importe quelle île). `shislandjake.type.*` donne les six types de la configuration par défaut.
+`shislandjake.admin` donne toutes les sous-commandes de `/shislandjake`, `shislandjake.bypass` (cliquer sur le Jake de n'importe quelle île) et `shislandjake.type.*`. `shislandjake.type.*` donne les six types de la configuration par défaut. Les permissions de type sont `op` par défaut : les joueurs les reçoivent par leur groupe.
 
 ## Placeholders
 

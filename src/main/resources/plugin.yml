@@ -35,7 +35,7 @@ permissions:
     default: true
   shislandjake.type.*:
     description: Tous les types de Jake de la configuration par défaut.
-    default: false
+    default: op
     children:
       shislandjake.type.villager: true
       shislandjake.type.evoker: true
@@ -45,22 +45,22 @@ permissions:
       shislandjake.type.witch: true
   shislandjake.type.villager:
     description: Jake en villageois.
-    default: false
+    default: op
   shislandjake.type.evoker:
     description: Jake en évocateur.
-    default: false
+    default: op
   shislandjake.type.pillager:
     description: Jake en pillard.
-    default: false
+    default: op
   shislandjake.type.vindicator:
     description: Jake en vindicateur.
-    default: false
+    default: op
   shislandjake.type.wandering_trader:
     description: Jake en marchand ambulant.
-    default: false
+    default: op
   shislandjake.type.witch:
     description: Jake en sorcière (Jakie).
-    default: false
+    default: op
   shislandjake.bypass:
     description: Cliquer sur le Jake de n'importe quelle île.
     default: op
@@ -73,6 +73,7 @@ permissions:
       shislandjake.admin.delete: true
       shislandjake.admin.import: true
       shislandjake.bypass: true
+      shislandjake.type.*: true
   shislandjake.admin.reload:
     description: Recharger config.yml et messages.yml (/shislandjake reload).
     default: op
