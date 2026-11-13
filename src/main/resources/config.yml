@@ -108,7 +108,7 @@ hologramme:
 
 clic:
   # Commande lancée par le joueur qui clique sur Jake. Vide = aucune.
-  commande: dm open island
+  commande: is
   # Le clic gauche compte aussi (les joueurs Bedrock tapent sur Jake).
   clic-gauche: true
   # Accroupi + clic : paramètres de Jake au lieu de la commande.
@@ -179,7 +179,7 @@ menu:
     retour: 22
     retour-materiau: PAPER
     # Commande lancée par le joueur avec le bouton retour. Vide = pas de bouton.
-    retour-commande: dm open island
+    retour-commande: is
   # Choix du type : les types prennent les cases dans l'ordre de « types ».
   types:
     remplissage: BLACK_STAINED_GLASS_PANE
