@@ -129,7 +129,6 @@ final class JakeDisplay {
             jake.setHologram(null);
             holograms.hideAll(hologram);
         }
-        jake.forgetLooks();
     }
 
     /** Arrêt ou rechargement : plus rien n'est dessiné. Un hologramme n'existe qu'avec son PNJ. */

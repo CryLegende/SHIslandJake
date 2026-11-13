@@ -29,6 +29,8 @@ Remplace IslandNPC : au premier démarrage, les PNJ de `plugins/IslandNPC/databa
 
 Le plugin garde lui-même ses Jake (`jakes.yml`) ; FancyNpcs ne fait que les dessiner. Ils ne sont ni dans `/npc list` ni dans son `npcs.yml`, et ne sont créés que là où un joueur passe : le suivi ne regarde que la grille autour de chaque joueur, le nombre d'îles n'entre pas en compte. Un Jake que personne n'a vu depuis `affichage.oubli-minutes` est rendu à la mémoire. Avec les mondes en parallèle de DivineMC, tout passe par le fil principal.
 
+Quand un joueur s'approche, Jake se tourne vers lui (`affichage.regarder-joueurs`) : tête, corps et inclinaison, jusqu'à `affichage.distance-regard` blocs, à la vitesse `affichage.vitesse-regard` pour que le mouvement reste fluide. Chaque joueur ne voit Jake tourné que vers lui-même, et Jake reprend son orientation d'origine quand le joueur s'éloigne. Seuls les Jake à moins de `distance-regard` + 4 blocs d'un joueur sont suivis, toutes les `intervalle-regard-ticks` ticks, et une rotation n'est envoyée que si l'angle change d'au moins `angle-regard-minimum` degrés : un joueur immobile ou loin de tout Jake ne coûte aucun paquet.
+
 Utilisé sur : **Opale**.
 
 ## Dépendances
@@ -61,7 +63,7 @@ Cliquez sur un fichier pour l'ouvrir :
 
 <pre>
 plugins/SHIslandJake/
-├── <a href="src/main/resources/config.yml">config.yml</a>     place de départ, affichage, hologramme, clic, types, menus, sons
+├── <a href="src/main/resources/config.yml">config.yml</a>     place de départ, affichage (dont le regard de Jake), hologramme, clic, types, menus, sons
 ├── <a href="src/main/resources/messages.yml">messages.yml</a>   messages du chat, hologramme, menus, noms des types
 └── jakes.yml       le Jake de chaque île (écrit par le plugin)
 </pre>

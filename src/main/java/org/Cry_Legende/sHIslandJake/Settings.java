@@ -41,6 +41,10 @@ public final class Settings {
     public final long forgetMillis;
     public final boolean lookAtPlayers;
     public final int lookDistance;
+    public final int lookIntervalTicks;
+    public final double lookSpeed;
+    public final double lookMinAngle;
+    public final double lookMaxPitch;
     public final boolean glowing;
     public final NamedTextColor glowColor;
 
@@ -101,8 +105,12 @@ public final class Settings {
         viewDistance = Math.max(1, c.getInt("affichage.distance", 32));
         trackerInterval = Math.max(1, c.getInt("affichage.intervalle-ticks", 10));
         forgetMillis = Math.max(1, c.getInt("affichage.oubli-minutes", 10)) * 60_000L;
-        lookAtPlayers = c.getBoolean("affichage.regarder-joueurs", false);
+        lookAtPlayers = c.getBoolean("affichage.regarder-joueurs", true);
         lookDistance = Math.max(1, c.getInt("affichage.distance-regard", 6));
+        lookIntervalTicks = Math.min(20, Math.max(1, c.getInt("affichage.intervalle-regard-ticks", 2)));
+        lookSpeed = Math.max(0, c.getDouble("affichage.vitesse-regard", 180));
+        lookMinAngle = Math.max(0.1, c.getDouble("affichage.angle-regard-minimum", 2));
+        lookMaxPitch = Math.min(90, Math.max(0, c.getDouble("affichage.inclinaison-regard-max", 40)));
         glowing = c.getBoolean("affichage.brillance", false);
         NamedTextColor color = NamedTextColor.NAMES.value(c.getString("affichage.couleur-brillance", "BLUE").toLowerCase(Locale.ROOT));
         if (color == null) {

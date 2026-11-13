@@ -5,8 +5,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -20,7 +18,6 @@ final class Jake {
     /** Hologramme FancyHolograms, gardé en Object pour que le plugin tourne sans FancyHolograms. */
     private Object hologram;
     private long lastSeen;
-    private final Map<UUID, Integer> lastLook = new HashMap<>();
 
     Jake(JakeData data) {
         this.data = data;
@@ -69,18 +66,7 @@ final class Jake {
         lastSeen = now;
     }
 
-    /** Vrai si cette orientation vient déjà d'être envoyée à ce joueur. */
-    boolean alreadyLooking(UUID player, int look) {
-        Integer previous = lastLook.put(player, look);
-        return previous != null && previous == look;
-    }
-
-    void forgetLooks() {
-        lastLook.clear();
-    }
-
     void forget(UUID player) {
-        lastLook.remove(player);
         if (handle != null) {
             handle.getIsVisibleForPlayer().remove(player);
             handle.getIsLookingAtPlayer().remove(player);

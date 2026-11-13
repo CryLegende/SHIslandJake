@@ -4,7 +4,9 @@
 #
 #  Chaque île SuperiorSkyblock2 a son Jake, posé près du centre à la création
 #  de l'île. Un clic sur Jake (membre de l'île) lance la commande « clic ».
-#  Accroupi + clic : les paramètres de Jake, comme /jake.
+#  Accroupi + clic : les paramètres de Jake, comme /jake. Quand un joueur
+#  s'approche, Jake se tourne vers lui (« regarder-joueurs ») ; chaque joueur
+#  ne le voit tourné que vers lui-même.
 #
 #  Le plugin garde lui-même ses Jake (jakes.yml), FancyNpcs ne fait que les
 #  dessiner : ils n'apparaissent ni dans /npc list ni dans son npcs.yml, et ne
@@ -70,10 +72,22 @@ affichage:
   # Un Jake qu'aucun joueur n'a vu depuis ce nombre de minutes est oublié par
   # FancyNpcs ; il est recréé au retour d'un joueur.
   oubli-minutes: 10
-  # Jake tourne la tête vers les joueurs proches.
-  regarder-joueurs: false
+  # Jake se tourne vers le joueur qui s'approche (tête, corps, inclinaison) et
+  # reprend son orientation d'origine quand le joueur s'éloigne.
+  regarder-joueurs: true
   # Distance, en blocs, à laquelle Jake regarde un joueur.
   distance-regard: 6
+  # Ticks entre deux mises à jour du regard de Jake pour un joueur proche.
+  # Seuls les Jake à moins de distance-regard + 4 blocs d'un joueur sont suivis.
+  intervalle-regard-ticks: 2
+  # Vitesse de rotation maximale de Jake, en degrés par seconde. 0 = d'un coup.
+  vitesse-regard: 180
+  # Angle minimal, en degrés, dont le regard doit changer pour qu'une mise à
+  # jour soit envoyée au joueur.
+  angle-regard-minimum: 2.0
+  # Inclinaison maximale de la tête de Jake, vers le haut comme vers le bas,
+  # en degrés.
+  inclinaison-regard-max: 40
   # Contour lumineux autour de Jake, et sa couleur : BLACK, DARK_BLUE,
   # DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY, DARK_GRAY, BLUE,
   # GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE.
