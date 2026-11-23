@@ -25,7 +25,7 @@ final class JakeCommands {
     private static final Set<String> MOVE = Set.of("deplacer", "déplacer", "location", "move", "change");
     private static final Set<String> VISIBILITY = Set.of("visibilite", "visibilité", "visibility");
     private static final Set<String> TYPE = Set.of("type", "mob");
-    private static final Set<String> MENU = Set.of("menu");
+    private static final Set<String> MENU = Set.of("menu", "reglages", "réglages", "settings");
     private static final List<String> ADMIN = List.of("reload", "info", "delete", "import");
     /** Anciennes sous-commandes d'administration de /islandnpc. */
     private static final Set<String> OLD_ADMIN = Set.of("reload", "about", "delete", "import", "info");
@@ -80,7 +80,9 @@ final class JakeCommands {
             plugin.messages().send(sender, "joueurs-seulement");
             return;
         }
-        if (sub.isEmpty() || MENU.contains(sub)) {
+        if (sub.isEmpty() && !plugin.settings().noArgCommand.isEmpty()) {
+            player.performCommand(plugin.settings().noArgCommand);
+        } else if (sub.isEmpty() || MENU.contains(sub)) {
             openMenu(player);
         } else if (MOVE.contains(sub)) {
             if (allowed(player, "shislandjake.deplacer")) {
@@ -197,6 +199,9 @@ final class JakeCommands {
 
     private String playerUsage(CommandSender sender) {
         List<String> parts = new ArrayList<>();
+        if (!plugin.settings().noArgCommand.isEmpty() && sender.hasPermission("shislandjake.use")) {
+            parts.add(plugin.messages().text("sous-commandes.reglages"));
+        }
         if (sender.hasPermission("shislandjake.deplacer")) {
             parts.add(plugin.messages().text("sous-commandes.deplacer"));
         }

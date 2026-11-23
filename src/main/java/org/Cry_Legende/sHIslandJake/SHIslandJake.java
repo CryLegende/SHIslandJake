@@ -27,6 +27,7 @@ public final class SHIslandJake extends JavaPlugin {
     private volatile Settings settings;
     private volatile Messages messages;
     private Islands islands;
+    private AlertCondition alerts;
     private JakeRegistry registry;
     private JakeStore store;
     private JakeDisplay display;
@@ -56,6 +57,7 @@ public final class SHIslandJake extends JavaPlugin {
         }
 
         islands = new Islands();
+        alerts = new AlertCondition(this);
         registry = new JakeRegistry();
         store = new JakeStore(getDataFolder(), getLogger());
         long start = System.nanoTime();
@@ -267,6 +269,10 @@ public final class SHIslandJake extends JavaPlugin {
 
     Islands islands() {
         return islands;
+    }
+
+    AlertCondition alerts() {
+        return alerts;
     }
 
     JakeRegistry registry() {

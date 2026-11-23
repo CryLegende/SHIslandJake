@@ -50,6 +50,7 @@ chat:
 
 # Noms des sous-commandes affichés dans les lignes d'utilisation.
 sous-commandes:
+  reglages: reglages
   deplacer: deplacer
   visibilite: visibilite
   type: type
@@ -63,6 +64,10 @@ placeholders:
 hologramme:
   - '&b&l{nom}'
   - '&7(clic droit)'
+
+# Ligne d'alerte au-dessus de l'hologramme (config.yml, alerte), montrée seulement au membre concerné.
+alerte:
+  - '&e&l!'
 
 # Nom de chaque type dans les menus et les messages, et nom de Jake sous ce type.
 # Un type sans « jake » garde le nom par défaut.

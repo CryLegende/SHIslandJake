@@ -19,16 +19,14 @@ import java.util.logging.Logger;
  */
 final class Holograms {
 
-    private static final String PREFIX = "shislandjake_";
-
     private final Logger log;
 
     Holograms(Logger log) {
         this.log = log;
     }
 
-    Object create(UUID island, Location location, List<String> lines, Settings settings) {
-        TextHologramData data = new TextHologramData(PREFIX + island, location);
+    Object create(String id, Location location, List<String> lines, Settings settings) {
+        TextHologramData data = new TextHologramData(id, location);
         data.setText(lines);
         data.setPersistent(false);
         data.setVisibilityDistance(settings.viewDistance);
@@ -41,7 +39,7 @@ final class Holograms {
         try {
             return FancyHologramsPlugin.get().getHologramManager().create(data);
         } catch (RuntimeException e) {
-            log.warning("FancyHolograms n'a pas créé l'hologramme de l'île " + island + " : " + e.getMessage());
+            log.warning("FancyHolograms n'a pas créé l'hologramme " + id + " : " + e.getMessage());
             return null;
         }
     }

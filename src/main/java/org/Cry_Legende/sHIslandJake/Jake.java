@@ -17,6 +17,8 @@ final class Jake {
     private Npc handle;
     /** Hologramme FancyHolograms, gardé en Object pour que le plugin tourne sans FancyHolograms. */
     private Object hologram;
+    /** Ligne d'alerte au-dessus de l'hologramme (« ! »), créée au premier joueur qui doit la voir. */
+    private Object alertHologram;
     private long lastSeen;
 
     Jake(JakeData data) {
@@ -56,6 +58,14 @@ final class Jake {
 
     void setHologram(Object hologram) {
         this.hologram = hologram;
+    }
+
+    Object alertHologram() {
+        return alertHologram;
+    }
+
+    void setAlertHologram(Object alertHologram) {
+        this.alertHologram = alertHologram;
     }
 
     long lastSeen() {

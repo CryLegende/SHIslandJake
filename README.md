@@ -29,6 +29,8 @@ Remplace IslandNPC : au premier démarrage, les PNJ de `plugins/IslandNPC/databa
 
 Le plugin garde lui-même ses Jake (`jakes.yml`) ; FancyNpcs ne fait que les dessiner. Ils ne sont ni dans `/npc list` ni dans son `npcs.yml`, et ne sont créés que là où un joueur passe : le suivi ne regarde que la grille autour de chaque joueur, le nombre d'îles n'entre pas en compte. Un Jake que personne n'a vu depuis `affichage.oubli-minutes` est rendu à la mémoire. Avec les mondes en parallèle de DivineMC, tout passe par le fil principal.
 
+Une ligne d'alerte (`alerte`, « ! » par défaut) peut s'afficher au-dessus de l'hologramme : seul un membre de l'île la voit, quand le placeholder `alerte.placeholder` vaut `alerte.valeur` pour lui (lu au plus une fois par `alerte.verification-ticks`). Sur Opale, elle dit que le guide (SHGuide) a quelque chose pour le joueur.
+
 Quand un joueur s'approche, Jake se tourne vers lui (`affichage.regarder-joueurs`) : tête, corps et inclinaison, jusqu'à `affichage.distance-regard` blocs, à la vitesse `affichage.vitesse-regard` pour que le mouvement reste fluide. Chaque joueur ne voit Jake tourné que vers lui-même, et Jake reprend son orientation d'origine quand le joueur s'éloigne. Seuls les Jake à moins de `distance-regard` + 4 blocs d'un joueur sont suivis, toutes les `intervalle-regard-ticks` ticks, et une rotation n'est envoyée que si l'angle change d'au moins `angle-regard-minimum` degrés : un joueur immobile ou loin de tout Jake ne coûte aucun paquet.
 
 Utilisé sur : **Opale**.
@@ -42,7 +44,8 @@ Facultatives : `FancyHolograms` (hologramme au-dessus de Jake ; sans lui, la pre
 
 | Commande | Permission | Effet |
 |---|---|---|
-| `/jake` (`/jack`, `/islandnpc`, `/isnpc`, `/is jake`, `/is npc`) | `shislandjake.use` (tous) | Paramètres de Jake |
+| `/jake` (`/jack`, `/islandnpc`, `/isnpc`, `/is jake`, `/is npc`) | `shislandjake.use` (tous) | Paramètres de Jake, ou la commande `jake-sans-argument.commande` si elle est remplie |
+| `/jake reglages` | `shislandjake.use` (tous) | Paramètres de Jake |
 | `/jake deplacer` | `shislandjake.deplacer` (tous) | Clic sur un bloc de son île pour y placer Jake |
 | `/jake visibilite` | `shislandjake.visibilite` (tous) | Cache ou montre Jake |
 | `/jake type [type]` | `shislandjake.use` + `shislandjake.type.<type>` | Choix du type |

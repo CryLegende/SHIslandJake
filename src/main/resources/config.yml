@@ -17,7 +17,8 @@
 #  sont repris : position, type et visibilité de chaque île.
 #
 #  Commandes joueur (alias /jack, /islandnpc, /isnpc, et /is jake, /is npc)
-#    /jake                      ouvre les paramètres de Jake
+#    /jake                      ouvre les paramètres de Jake (ou lance jake-sans-argument.commande)
+#    /jake reglages             ouvre les paramètres de Jake
 #    /jake deplacer             clic sur un bloc de son île pour y placer Jake
 #    /jake visibilite           cache ou montre Jake à tout le monde
 #    /jake type [type]          choisit le type de Jake (menu sans argument)
@@ -117,6 +118,22 @@ clic:
   membres: true
   # Délai minimal, en millisecondes, entre deux clics pris en compte.
   delai-ms: 500
+
+# /jake sans argument : commande lancée par le joueur à la place des paramètres de Jake. Vide = les paramètres.
+# Les paramètres restent sur /jake reglages et sur Accroupi + clic.
+jake-sans-argument:
+  commande: ""
+
+alerte:
+  # Ligne au-dessus de l'hologramme de Jake (messages.yml, alerte), montrée à un membre de l'île seulement,
+  # quand le placeholder vaut « valeur » pour lui. Demande PlaceholderAPI et FancyHolograms.
+  actif: false
+  placeholder: "%shguide_alerte%"
+  valeur: "oui"
+  # Hauteur, en blocs, au-dessus du bas de l'hologramme.
+  decalage: 0.6
+  # Intervalle, en ticks, entre deux lectures du placeholder pour un même joueur.
+  verification-ticks: 20
 
 deplacement:
   # Secondes laissées au joueur pour cliquer sur le bloc où placer Jake.

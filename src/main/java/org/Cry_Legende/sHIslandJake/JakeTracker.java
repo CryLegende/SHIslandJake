@@ -2,6 +2,7 @@ package org.Cry_Legende.sHIslandJake;
 
 import de.oliver.fancynpcs.api.FancyNpcsPlugin;
 import de.oliver.fancynpcs.api.Npc;
+import com.bgsoftware.superiorskyblock.api.island.Island;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -119,6 +120,7 @@ final class JakeTracker {
         watched.remove(id);
         looks.remove(id);
         display.forget(player);
+        plugin.alerts().forget(player);
     }
 
     /** Après une téléportation, la position n'est à jour qu'au tick suivant. */
@@ -187,6 +189,12 @@ final class JakeTracker {
             double distance = square(location.getX() - d.x()) + square(location.getY() - d.y())
                     + square(location.getZ() - d.z());
             display.syncHologram(jake, player, distance <= range);
+            boolean alert = distance <= range && plugin.alerts().shows(player);
+            if (alert) {
+                Island island = plugin.islands().byId(d.island());
+                alert = island != null && plugin.islands().canUse(player, island, true);
+            }
+            display.syncAlert(jake, player, alert);
             if (kept == null) {
                 kept = new HashSet<>();
             }
@@ -209,6 +217,7 @@ final class JakeTracker {
                 if ((kept == null || !kept.contains(jake)) && jake.handle() != null) {
                     jake.handle().checkAndUpdateVisibility(player);
                     display.syncHologram(jake, player, false);
+                    display.syncAlert(jake, player, false);
                 }
             }
         }

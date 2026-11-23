@@ -60,6 +60,14 @@ public final class Settings {
     public final boolean membersCanClick;
     public final long clickDelayMillis;
 
+    public final String noArgCommand;
+
+    public final boolean alertEnabled;
+    public final String alertPlaceholder;
+    public final String alertValue;
+    public final double alertOffset;
+    public final int alertCheckTicks;
+
     public final int moveSeconds;
     public final List<String> islandSubCommands;
 
@@ -130,6 +138,14 @@ public final class Settings {
         sneakOpensMenu = c.getBoolean("clic.accroupi-ouvre-menu", true);
         membersCanClick = c.getBoolean("clic.membres", true);
         clickDelayMillis = Math.max(0, c.getLong("clic.delai-ms", 500));
+
+        noArgCommand = stripSlash(c.getString("jake-sans-argument.commande", ""));
+
+        alertEnabled = c.getBoolean("alerte.actif", false);
+        alertPlaceholder = c.getString("alerte.placeholder", "");
+        alertValue = c.getString("alerte.valeur", "oui");
+        alertOffset = c.getDouble("alerte.decalage", 0.6);
+        alertCheckTicks = Math.max(1, c.getInt("alerte.verification-ticks", 20));
 
         moveSeconds = Math.max(1, c.getInt("deplacement.temps-secondes", 15));
         List<String> sub = new ArrayList<>();
