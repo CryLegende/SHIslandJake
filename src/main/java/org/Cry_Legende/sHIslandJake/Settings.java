@@ -10,6 +10,7 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -85,6 +86,8 @@ public final class Settings {
     public final int backSlot;
     public final Material backMaterial;
     public final String backCommand;
+    /** Retour selon d'où le menu a été ouvert : /jake reglages <origine> ; une origine inconnue garde backCommand. */
+    public final Map<String, String> backByOrigin;
     public final Material typesFiller;
     public final List<Integer> typesSlots;
     public final int typesBackSlot;
@@ -168,6 +171,14 @@ public final class Settings {
         backSlot = c.getInt("menu.principal.retour", 22);
         backMaterial = material(c, "menu.principal.retour-materiau", Material.PAPER, log);
         backCommand = stripSlash(c.getString("menu.principal.retour-commande", ""));
+        Map<String, String> origins = new HashMap<>();
+        ConfigurationSection retours = c.getConfigurationSection("menu.principal.retours");
+        if (retours != null) {
+            for (String k : retours.getKeys(false)) {
+                origins.put(k.toLowerCase(Locale.ROOT), stripSlash(retours.getString(k, "")));
+            }
+        }
+        backByOrigin = Map.copyOf(origins);
         typesFiller = material(c, "menu.types.remplissage", Material.BLACK_STAINED_GLASS_PANE, log);
         typesSlots = List.copyOf(c.getIntegerList("menu.types.cases"));
         typesBackSlot = c.getInt("menu.types.retour", 22);

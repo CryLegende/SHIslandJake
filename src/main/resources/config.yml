@@ -197,6 +197,9 @@ menu:
     retour-materiau: PAPER
     # Commande lancée par le joueur avec le bouton retour. Vide = pas de bouton.
     retour-commande: is
+    # Retour selon le menu d'où vient le joueur : /jake reglages <origine>. Ex. « guide: guide » pour un menu
+    # qui ouvre les paramètres avec /jake reglages guide.
+    retours: {}
   # Choix du type : les types prennent les cases dans l'ordre de « types ».
   types:
     remplissage: BLACK_STAINED_GLASS_PANE

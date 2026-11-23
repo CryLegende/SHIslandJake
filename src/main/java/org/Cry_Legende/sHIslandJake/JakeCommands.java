@@ -83,7 +83,7 @@ final class JakeCommands {
         if (sub.isEmpty() && !plugin.settings().noArgCommand.isEmpty()) {
             player.performCommand(plugin.settings().noArgCommand);
         } else if (sub.isEmpty() || MENU.contains(sub)) {
-            openMenu(player);
+            openMenu(player, args.length > 1 ? args[1] : "");
         } else if (MOVE.contains(sub)) {
             if (allowed(player, "shislandjake.deplacer")) {
                 withJake(player, jake -> startMove(player, jake));
@@ -113,14 +113,24 @@ final class JakeCommands {
 
     /** /jake, /is jake : paramètres du Jake de son île. */
     void openMenu(Player player) {
+        openMenu(player, "");
+    }
+
+    /** @param origin menu d'où vient le joueur (menu.principal.retours) ; vide = retour-commande */
+    void openMenu(Player player, String origin) {
         if (allowed(player, "shislandjake.use")) {
-            withJake(player, jake -> menu(player, JakeMenu.Kind.MAIN, jake));
+            String back = plugin.settings().backByOrigin.getOrDefault(origin.toLowerCase(Locale.ROOT),
+                    plugin.settings().backCommand);
+            withJake(player, jake -> {
+                plugin.sound(player, plugin.settings().soundMenu);
+                JakeMenu.open(plugin, player, JakeMenu.Kind.MAIN, jake, back);
+            });
         }
     }
 
     private void menu(Player player, JakeMenu.Kind kind, Jake jake) {
         plugin.sound(player, plugin.settings().soundMenu);
-        JakeMenu.open(plugin, player, kind, jake);
+        JakeMenu.open(plugin, player, kind, jake, plugin.settings().backCommand);
     }
 
     void startMove(Player player, Jake jake) {

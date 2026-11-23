@@ -33,17 +33,20 @@ final class JakeMenu implements InventoryHolder {
     private final SHIslandJake plugin;
     private final Kind kind;
     private final UUID island;
+    /** Commande du bouton retour, gardée quand le menu se rouvre (visibilité, choix du type). */
+    private final String back;
     private final Map<Integer, EntityType> typeSlots = new HashMap<>();
     private Inventory inventory;
 
-    private JakeMenu(SHIslandJake plugin, Kind kind, UUID island) {
+    private JakeMenu(SHIslandJake plugin, Kind kind, UUID island, String back) {
         this.plugin = plugin;
         this.kind = kind;
         this.island = island;
+        this.back = back == null ? "" : back;
     }
 
-    static void open(SHIslandJake plugin, Player player, Kind kind, Jake jake) {
-        JakeMenu menu = new JakeMenu(plugin, kind, jake.island());
+    static void open(SHIslandJake plugin, Player player, Kind kind, Jake jake, String back) {
+        JakeMenu menu = new JakeMenu(plugin, kind, jake.island(), back);
         menu.build(player, jake);
         player.openInventory(menu.inventory);
     }
@@ -111,7 +114,7 @@ final class JakeMenu implements InventoryHolder {
         put(s.positionSlot, item(s.positionMaterial, m.text("menu.principal.position.nom", "nom", name),
                 m.lines("menu.principal.position.description", "nom", name)));
 
-        if (!s.backCommand.isEmpty()) {
+        if (!back.isEmpty()) {
             put(s.backSlot, item(s.backMaterial, m.text("menu.principal.retour.nom"), List.of()));
         }
     }
@@ -154,26 +157,26 @@ final class JakeMenu implements InventoryHolder {
         }
         if (kind == Kind.MAIN) {
             if (slot == s.typeSlot) {
-                open(plugin, player, Kind.TYPES, jake);
+                open(plugin, player, Kind.TYPES, jake, back);
             } else if (slot == s.visibilitySlot) {
                 plugin.commands().toggleVisibility(player, jake);
-                open(plugin, player, Kind.MAIN, jake);
+                open(plugin, player, Kind.MAIN, jake, back);
             } else if (slot == s.positionSlot) {
                 player.closeInventory();
                 plugin.commands().startMove(player, jake);
-            } else if (slot == s.backSlot && !s.backCommand.isEmpty()) {
+            } else if (slot == s.backSlot && !back.isEmpty()) {
                 player.closeInventory();
-                player.performCommand(s.backCommand);
+                player.performCommand(back);
             }
             return;
         }
         if (slot == s.typesBackSlot) {
-            open(plugin, player, Kind.MAIN, jake);
+            open(plugin, player, Kind.MAIN, jake, back);
             return;
         }
         EntityType type = typeSlots.get(slot);
         if (type != null && plugin.commands().changeType(player, jake, type)) {
-            open(plugin, player, Kind.TYPES, jake);
+            open(plugin, player, Kind.TYPES, jake, back);
         }
     }
 
