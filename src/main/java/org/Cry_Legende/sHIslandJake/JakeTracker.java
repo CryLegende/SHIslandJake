@@ -189,10 +189,12 @@ final class JakeTracker {
             double distance = square(location.getX() - d.x()) + square(location.getY() - d.y())
                     + square(location.getZ() - d.z());
             display.syncHologram(jake, player, distance <= range);
-            boolean alert = distance <= range && plugin.alerts().shows(player);
-            if (alert) {
+            String alert = distance <= range ? plugin.alerts().text(player) : "";
+            if (!alert.isEmpty()) {
                 Island island = plugin.islands().byId(d.island());
-                alert = island != null && plugin.islands().canUse(player, island, true);
+                if (island == null || !plugin.islands().canUse(player, island, true)) {
+                    alert = "";
+                }
             }
             display.syncAlert(jake, player, alert);
             if (kept == null) {
@@ -217,7 +219,7 @@ final class JakeTracker {
                 if ((kept == null || !kept.contains(jake)) && jake.handle() != null) {
                     jake.handle().checkAndUpdateVisibility(player);
                     display.syncHologram(jake, player, false);
-                    display.syncAlert(jake, player, false);
+                    display.syncAlert(jake, player, "");
                 }
             }
         }

@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * /jake (paramètres du Jake de son île) et /shislandjake (administration). Les deux passent par le fil
+ * /jake (Jake et ses réglages) et /shislandjake (administration). Les deux passent par le fil
  * principal, où vivent les Jake.
  */
 final class JakeCommands {
@@ -68,7 +68,7 @@ final class JakeCommands {
 
     //JOUEUR----------
 
-    private void playerCommand(CommandSender sender, String[] args) {
+    void playerCommand(CommandSender sender, String[] args) {
         String sub = args.length == 0 ? "" : args[0].toLowerCase(Locale.ROOT);
         if (OLD_ADMIN.contains(sub) && sender.hasPermission("shislandjake.admin." + adminName(sub))) {
             String[] rest = args.clone();
@@ -106,12 +106,14 @@ final class JakeCommands {
                 return;
             }
             withJake(player, jake -> changeType(player, jake, type));
+        } else if (!plugin.settings().unknownCommand.isEmpty()) {
+            player.performCommand(Messages.replace(plugin.settings().unknownCommand, "arguments", String.join(" ", args)));
         } else {
             plugin.messages().send(player, "utilisation", "commandes", playerUsage(player));
         }
     }
 
-    /** /jake, /is jake : paramètres du Jake de son île. */
+    /** Accroupi + clic : réglages du Jake de son île. */
     void openMenu(Player player) {
         openMenu(player, "");
     }
@@ -224,9 +226,15 @@ final class JakeCommands {
         return "[" + String.join("|", parts) + "]";
     }
 
-    private List<String> playerTab(CommandSender sender, String[] args) {
+    List<String> playerTab(CommandSender sender, String[] args) {
         List<String> options = new ArrayList<>();
         if (args.length == 1) {
+            if (!plugin.settings().unknownCommand.isEmpty()) {
+                options.addAll(plugin.settings().unknownSuggestions);
+            }
+            if (!plugin.settings().noArgCommand.isEmpty() && sender.hasPermission("shislandjake.use")) {
+                options.add("reglages");
+            }
             if (sender.hasPermission("shislandjake.deplacer")) {
                 options.add("deplacer");
             }

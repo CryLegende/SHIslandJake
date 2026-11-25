@@ -4,7 +4,7 @@
 
 # SHIslandJake
 
-*Jake, le PNJ de chaque île : un clic ouvre le menu de l'île, ses paramètres se règlent depuis /jake.*
+*Jake, le PNJ de chaque île : un clic lance une commande (le guide sur Opale), ses réglages s'ouvrent avec /jake reglages.*
 
 <img src="https://img.shields.io/badge/Paper-26.3-f2a900?style=for-the-badge" alt="Paper 26.3"> <img src="https://img.shields.io/badge/Java-25-e76f00?style=for-the-badge" alt="Java 25"> <img src="https://img.shields.io/badge/SkyHand-Opale-3aa655?style=for-the-badge" alt="SkyHand Opale">
 
@@ -14,22 +14,24 @@
 
 ## Présentation
 
-Chaque île SuperiorSkyblock2 a son Jake, posé près du centre à la création de l'île, avec un hologramme au-dessus de lui. Un membre de l'île qui clique sur Jake lance la commande `clic.commande` (le menu de l'île sur Opale) ; accroupi, il ouvre les paramètres de Jake. Un visiteur reçoit un message.
+Chaque île SuperiorSkyblock2 a son Jake, posé près du centre à la création de l'île, avec un hologramme au-dessus de lui. Un membre de l'île qui clique sur Jake lance la commande `clic.commande` (le guide, SHGuide, sur Opale) ; accroupi, il ouvre les réglages de Jake. Un visiteur reçoit un message.
 
-Paramètres de Jake (`/jake`, `/is jake`, accroupi + clic) :
+Réglages de Jake (`/jake reglages`, accroupi + clic, ou `/jake` quand `jake-sans-argument` est vide) :
 
 | Bouton | Effet |
 |---|---|
-| Type | Choix parmi les types de `types` (villageois, évocateur, pillard, vindicateur, marchand, sorcière). Chaque type peut demander une permission. Sorcière : Jake s'appelle Jakie. |
+| Apparence | Choix parmi les types de `types` (villageois, évocateur, pillard, vindicateur, marchand, sorcière). Chaque type peut demander une permission. Sorcière : Jake s'appelle Jakie. |
 | Visibilité | Cache Jake (et son hologramme) à tout le monde, ou le remontre. |
 | Position | Le prochain clic sur un bloc de son île y pose Jake, tourné vers le joueur. |
-| Retour | Commande `menu.principal.retour-commande` (le menu de l'île). |
+| Retour | Commande `menu.principal.retour-commande` (le guide sur Opale), ou celle de `menu.principal.retours` selon d'où vient le joueur (`/jake reglages <origine>`). |
+
+Les deux menus se règlent dans `menu` : lignes, vitres du tour et de l'accent, tête de Jake, cases.
 
 Remplace IslandNPC : au premier démarrage, les PNJ de `plugins/IslandNPC/database.db` sont repris (type, visibilité, monde, position ; IslandNPC ne gardait pas d'orientation par PNJ). Les anciennes commandes `/islandnpc`, `/isnpc` et leurs sous-commandes `location`, `visibility`, `mob` restent acceptées.
 
 Le plugin garde lui-même ses Jake (`jakes.yml`) ; FancyNpcs ne fait que les dessiner. Ils ne sont ni dans `/npc list` ni dans son `npcs.yml`, et ne sont créés que là où un joueur passe : le suivi ne regarde que la grille autour de chaque joueur, le nombre d'îles n'entre pas en compte. Un Jake que personne n'a vu depuis `affichage.oubli-minutes` est rendu à la mémoire. Avec les mondes en parallèle de DivineMC, tout passe par le fil principal.
 
-Une ligne d'alerte (`alerte`, « ! » par défaut) peut s'afficher au-dessus de l'hologramme : seul un membre de l'île la voit, quand le placeholder `alerte.placeholder` vaut `alerte.valeur` pour lui (lu au plus une fois par `alerte.verification-ticks`). Sur Opale, elle dit que le guide (SHGuide) a quelque chose pour le joueur.
+Une ligne d'alerte (`alerte`, « ! » par défaut) peut s'afficher au-dessus de l'hologramme : seul un membre de l'île la voit, quand le placeholder `alerte.placeholder` vaut `alerte.valeur` pour lui. Ses lignes (`alerte` de `messages.yml`) peuvent contenir des placeholders, lus pour ce joueur au plus une fois par `alerte.verification-ticks`. Sur Opale, elle dit ce que le guide (SHGuide) a pour le joueur : cadeau prêt, nouveautés, tâches du jour.
 
 Quand un joueur s'approche, Jake se tourne vers lui (`affichage.regarder-joueurs`) : tête, corps et inclinaison, jusqu'à `affichage.distance-regard` blocs, à la vitesse `affichage.vitesse-regard` pour que le mouvement reste fluide. Chaque joueur ne voit Jake tourné que vers lui-même, et Jake reprend son orientation d'origine quand le joueur s'éloigne. Seuls les Jake à moins de `distance-regard` + 4 blocs d'un joueur sont suivis, toutes les `intervalle-regard-ticks` ticks, et une rotation n'est envoyée que si l'angle change d'au moins `angle-regard-minimum` degrés : un joueur immobile ou loin de tout Jake ne coûte aucun paquet.
 
@@ -38,17 +40,18 @@ Utilisé sur : **Opale**.
 ## Dépendances
 
 Requises : `SuperiorSkyblock2`, `FancyNpcs`.
-Facultatives : `FancyHolograms` (hologramme au-dessus de Jake ; sans lui, la première ligne devient le nom du PNJ), `PlaceholderAPI`.
+Facultatives : `FancyHolograms` (hologramme au-dessus de Jake ; sans lui, la première ligne devient le nom du PNJ), `PlaceholderAPI` (alerte, placeholders), `HeadDatabase` (tête de Jake `hdb-<id>` dans les menus).
 
 ## Commandes
 
 | Commande | Permission | Effet |
 |---|---|---|
-| `/jake` (`/jack`, `/islandnpc`, `/isnpc`, `/is jake`, `/is npc`) | `shislandjake.use` (tous) | Paramètres de Jake, ou la commande `jake-sans-argument.commande` si elle est remplie |
-| `/jake reglages` | `shislandjake.use` (tous) | Paramètres de Jake |
+| `/jake` (`/jack`, `/islandnpc`, `/isnpc`, `/is jake`, `/is npc`) | `shislandjake.use` (tous) | La commande `jake-sans-argument.commande`, ou les réglages de Jake si elle est vide |
+| `/jake reglages [origine]` | `shislandjake.use` (tous) | Réglages de Jake |
+| `/jake <autre chose>` | | La commande `jake-argument-inconnu.commande` (`{arguments}` = ce que le joueur a tapé), ou la liste des commandes si elle est vide |
 | `/jake deplacer` | `shislandjake.deplacer` (tous) | Clic sur un bloc de son île pour y placer Jake |
 | `/jake visibilite` | `shislandjake.visibilite` (tous) | Cache ou montre Jake |
-| `/jake type [type]` | `shislandjake.use` + `shislandjake.type.<type>` | Choix du type |
+| `/jake type [type]` | `shislandjake.use` + `shislandjake.type.<type>` | Choix de l'apparence |
 | `/shislandjake reload` | `shislandjake.admin.reload` | Recharge `config.yml` et `messages.yml` |
 | `/shislandjake info [joueur]` | `shislandjake.admin.info` | Nombre de Jake, ou le Jake de l'île d'un joueur |
 | `/shislandjake delete [joueur]` | `shislandjake.admin.delete` | Retire le Jake de l'île où l'on est (ou d'un joueur) ; il revient au prochain `/jake` |

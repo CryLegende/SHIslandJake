@@ -30,6 +30,15 @@ public final class Settings {
         }
     }
 
+    /** Cadre d'un menu : lignes, vitres du bord et de l'accent, objet des autres cases (null = vides), tête de Jake. */
+    public record Frame(int rows, Material fill, Material ring, List<Integer> ringSlots, Material accent,
+                        List<Integer> accentSlots, int headSlot, String headIcon) {
+
+        public int size() {
+            return rows * 9;
+        }
+    }
+
     public final EntityType defaultType;
     public final boolean defaultVisible;
     public final boolean createWithIsland;
@@ -62,6 +71,9 @@ public final class Settings {
     public final long clickDelayMillis;
 
     public final String noArgCommand;
+    /** /jake avec un argument que le plugin ne connaît pas ; {arguments} = ce que le joueur a tapé. Vide = l'utilisation. */
+    public final String unknownCommand;
+    public final List<String> unknownSuggestions;
 
     public final boolean alertEnabled;
     public final String alertPlaceholder;
@@ -74,9 +86,8 @@ public final class Settings {
 
     public final Map<EntityType, TypeSettings> types;
 
-    public final Material mainFiller;
-    public final List<Integer> mainGraySlots;
-    public final Material mainGray;
+    public final int closeTicks;
+    public final Frame mainFrame;
     public final int typeSlot;
     public final int visibilitySlot;
     public final Material visibleMaterial;
@@ -88,7 +99,7 @@ public final class Settings {
     public final String backCommand;
     /** Retour selon d'où le menu a été ouvert : /jake reglages <origine> ; une origine inconnue garde backCommand. */
     public final Map<String, String> backByOrigin;
-    public final Material typesFiller;
+    public final Frame typesFrame;
     public final List<Integer> typesSlots;
     public final int typesBackSlot;
     public final Material typesBackMaterial;
@@ -143,6 +154,8 @@ public final class Settings {
         clickDelayMillis = Math.max(0, c.getLong("clic.delai-ms", 500));
 
         noArgCommand = stripSlash(c.getString("jake-sans-argument.commande", ""));
+        unknownCommand = stripSlash(c.getString("jake-argument-inconnu.commande", ""));
+        unknownSuggestions = List.copyOf(c.getStringList("jake-argument-inconnu.suggestions"));
 
         alertEnabled = c.getBoolean("alerte.actif", false);
         alertPlaceholder = c.getString("alerte.placeholder", "");
@@ -159,16 +172,15 @@ public final class Settings {
         }
         islandSubCommands = List.copyOf(sub);
 
-        mainFiller = material(c, "menu.principal.remplissage", Material.BLACK_STAINED_GLASS_PANE, log);
-        mainGraySlots = List.copyOf(c.getIntegerList("menu.principal.cases-grises"));
-        mainGray = material(c, "menu.principal.materiau-gris", Material.GRAY_STAINED_GLASS_PANE, log);
-        typeSlot = c.getInt("menu.principal.type", 11);
-        visibilitySlot = c.getInt("menu.principal.visibilite", 13);
+        closeTicks = Math.max(0, c.getInt("menu.fermeture-ticks", 6));
+        mainFrame = frame(c, "menu.principal", log);
+        typeSlot = c.getInt("menu.principal.type", 20);
+        visibilitySlot = c.getInt("menu.principal.visibilite", 22);
         visibleMaterial = material(c, "menu.principal.materiau-visible", Material.LIME_DYE, log);
         hiddenMaterial = material(c, "menu.principal.materiau-cache", Material.GRAY_DYE, log);
-        positionSlot = c.getInt("menu.principal.position", 15);
+        positionSlot = c.getInt("menu.principal.position", 24);
         positionMaterial = material(c, "menu.principal.position-materiau", Material.COMPASS, log);
-        backSlot = c.getInt("menu.principal.retour", 22);
+        backSlot = c.getInt("menu.principal.retour", 36);
         backMaterial = material(c, "menu.principal.retour-materiau", Material.PAPER, log);
         backCommand = stripSlash(c.getString("menu.principal.retour-commande", ""));
         Map<String, String> origins = new HashMap<>();
@@ -179,9 +191,9 @@ public final class Settings {
             }
         }
         backByOrigin = Map.copyOf(origins);
-        typesFiller = material(c, "menu.types.remplissage", Material.BLACK_STAINED_GLASS_PANE, log);
+        typesFrame = frame(c, "menu.types", log);
         typesSlots = List.copyOf(c.getIntegerList("menu.types.cases"));
-        typesBackSlot = c.getInt("menu.types.retour", 22);
+        typesBackSlot = c.getInt("menu.types.retour", 36);
         typesBackMaterial = material(c, "menu.types.retour-materiau", Material.PAPER, log);
 
         soundClick = c.getString("sons.clic", "");
@@ -194,6 +206,38 @@ public final class Settings {
     public double height(EntityType type) {
         TypeSettings settings = types.get(type);
         return settings == null ? defaultHeight : settings.height();
+    }
+
+    /** Cadre du menu « path » ; sans cases écrites, le bord est le tour du menu et l'accent les colonnes 2 et 8. */
+    private static Frame frame(FileConfiguration c, String path, Logger log) {
+        int rows = Math.min(6, Math.max(1, c.getInt(path + ".lignes", 5)));
+        List<Integer> ring = new ArrayList<>();
+        List<Integer> accent = new ArrayList<>();
+        for (int slot = 0; slot < rows * 9; slot++) {
+            int row = slot / 9;
+            int column = slot % 9;
+            if (row == 0 || row == rows - 1 || column == 0 || column == 8) {
+                ring.add(slot);
+            } else if (column == 1 || column == 7) {
+                accent.add(slot);
+            }
+        }
+        if (c.isList(path + ".contour-cases")) {
+            ring = c.getIntegerList(path + ".contour-cases");
+        }
+        if (c.isList(path + ".accent-cases")) {
+            accent = c.getIntegerList(path + ".accent-cases");
+        }
+        return new Frame(rows, pane(c, path + ".remplissage", null, log),
+                pane(c, "menu.contour", Material.BLACK_STAINED_GLASS_PANE, log), List.copyOf(ring),
+                pane(c, "menu.accent", Material.CYAN_STAINED_GLASS_PANE, log), List.copyOf(accent),
+                c.getInt(path + ".jake", 4), c.getString("menu.jake-objet", "PLAYER_HEAD"));
+    }
+
+    /** Objet facultatif : null quand la clé est vide. */
+    private static Material pane(FileConfiguration c, String path, Material fallback, Logger log) {
+        String name = c.getString(path);
+        return name != null && name.isBlank() ? null : material(c, path, fallback, log);
     }
 
     private Map<EntityType, TypeSettings> readTypes(ConfigurationSection section, Logger log) {
@@ -252,7 +296,8 @@ public final class Settings {
         }
         Material material = Material.matchMaterial(name);
         if (material == null || !material.isItem()) {
-            log.warning(path + " : objet « " + name + " » inconnu, " + fallback.name() + " est utilisé.");
+            log.warning(path + " : objet « " + name + " » inconnu"
+                    + (fallback == null ? "." : ", " + fallback.name() + " est utilisé."));
             return fallback;
         }
         return material;

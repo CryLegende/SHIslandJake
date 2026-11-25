@@ -5,13 +5,16 @@ import com.bgsoftware.superiorskyblock.api.commands.SuperiorCommand;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Sous-commande de /is (« sous-commandes-ile », /is jake et /is npc par défaut) : paramètres de Jake.
+ * Sous-commande de /is (« sous-commandes-ile », /is jake et /is npc par défaut) : la même chose que /jake.
  */
 final class IslandSubCommand implements SuperiorCommand {
+
+    private static final int MAX_ARGS = 3;
 
     private final SHIslandJake plugin;
     private final List<String> aliases;
@@ -48,7 +51,7 @@ final class IslandSubCommand implements SuperiorCommand {
 
     @Override
     public int getMaxArgs() {
-        return 1;
+        return MAX_ARGS;
     }
 
     @Override
@@ -64,12 +67,17 @@ final class IslandSubCommand implements SuperiorCommand {
     @Override
     public void execute(SuperiorSkyblock superiorSkyblock, CommandSender sender, String[] args) {
         if (sender instanceof Player player) {
-            plugin.sync(() -> plugin.commands().openMenu(player));
+            plugin.sync(() -> plugin.commands().playerCommand(player, after(args)));
         }
     }
 
     @Override
     public List<String> tabComplete(SuperiorSkyblock superiorSkyblock, CommandSender sender, String[] args) {
-        return List.of();
+        return plugin.commands().playerTab(sender, after(args));
+    }
+
+    /** Ce qui suit « /is jake ». */
+    private static String[] after(String[] args) {
+        return args.length <= 1 ? new String[0] : Arrays.copyOfRange(args, 1, args.length);
     }
 }

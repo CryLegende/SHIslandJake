@@ -113,38 +113,37 @@ final class JakeDisplay {
         }
     }
 
-    /** Montre ou cache la ligne d'alerte (« ! ») au-dessus de l'hologramme du Jake à ce joueur. */
-    void syncAlert(Jake jake, Player player, boolean shown) {
+    /** Montre à ce joueur sa ligne d'alerte au-dessus de l'hologramme, la change ou l'enlève (texte vide). */
+    void syncAlert(Jake jake, Player player, String text) {
         if (!useHolograms()) {
             return;
         }
-        Object alert = jake.alertHologram();
-        if (alert == null) {
-            if (!shown) {
-                return;
-            }
-            Location base = jake.location();
-            if (base == null) {
-                return;
-            }
-            JakeData d = jake.data();
-            base.add(0, plugin.settings().height(d.type()) + plugin.settings().alertOffset, 0);
-            base.setYaw(0);
-            base.setPitch(0);
-            List<String> lines = new ArrayList<>();
-            for (String line : plugin.messages().lines("alerte")) {
-                lines.add(Messages.miniMessage(line));
-            }
-            alert = holograms.create("shislandjake_alerte_" + d.island(), base, lines, plugin.settings());
-            if (alert == null) {
-                return;
-            }
-            jake.setAlertHologram(alert);
+        UUID id = player.getUniqueId();
+        Jake.Alert current = jake.alerts().get(id);
+        if (current != null && current.text().equals(text)) {
+            holograms.show(current.hologram(), player);
+            return;
         }
-        if (shown) {
-            holograms.show(alert, player);
-        } else {
-            holograms.hide(alert, player);
+        if (current != null) {
+            jake.alerts().remove(id);
+            holograms.hideAll(current.hologram());
+        }
+        Location base = text.isEmpty() ? null : jake.location();
+        if (base == null) {
+            return;
+        }
+        JakeData d = jake.data();
+        base.add(0, plugin.settings().height(d.type()) + plugin.settings().alertOffset, 0);
+        base.setYaw(0);
+        base.setPitch(0);
+        List<String> lines = new ArrayList<>();
+        for (String line : text.split("\n")) {
+            lines.add(Messages.miniMessage(line));
+        }
+        Object hologram = holograms.create("shislandjake_alerte_" + d.island() + "_" + id, base, lines, plugin.settings());
+        if (hologram != null) {
+            jake.alerts().put(id, new Jake.Alert(hologram, text));
+            holograms.show(hologram, player);
         }
     }
 
@@ -164,11 +163,10 @@ final class JakeDisplay {
             jake.setHologram(null);
             holograms.hideAll(hologram);
         }
-        Object alert = jake.alertHologram();
-        if (alert != null) {
-            jake.setAlertHologram(null);
-            holograms.hideAll(alert);
+        for (Jake.Alert alert : jake.alerts().values()) {
+            holograms.hideAll(alert.hologram());
         }
+        jake.alerts().clear();
     }
 
     /** Arrêt ou rechargement : plus rien n'est dessiné. Un hologramme n'existe qu'avec son PNJ. */
@@ -186,8 +184,9 @@ final class JakeDisplay {
             if (jake.hologram() != null) {
                 holograms.forget(jake.hologram(), player);
             }
-            if (jake.alertHologram() != null) {
-                holograms.forget(jake.alertHologram(), player);
+            Jake.Alert alert = jake.alerts().remove(id);
+            if (alert != null) {
+                holograms.forget(alert.hologram(), player);
             }
         }
     }

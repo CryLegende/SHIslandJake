@@ -118,6 +118,12 @@ public final class SHIslandJake extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // un menu resté ouvert ne serait plus protégé des clics
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getOpenInventory().getTopInventory().getHolder(false) instanceof JakeMenu) {
+                player.closeInventory();
+            }
+        }
         if (saveTask != null) {
             saveTask.cancel();
         }

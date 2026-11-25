@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Paramètres de Jake (type, visibilité, position) et choix du type. Ouvert et cliqué sur le fil principal.
+ * Réglages de Jake (apparence, visibilité, position) et choix de l'apparence. Ouvert et cliqué sur le fil principal.
  */
 final class JakeMenu implements InventoryHolder {
 
@@ -27,8 +27,6 @@ final class JakeMenu implements InventoryHolder {
         MAIN,
         TYPES
     }
-
-    private static final int SIZE = 27;
 
     private final SHIslandJake plugin;
     private final Kind kind;
@@ -61,11 +59,19 @@ final class JakeMenu implements InventoryHolder {
         Settings s = plugin.settings();
         JakeData d = jake.data();
         String name = m.jakeName(d.type());
-        String titleKey = kind == Kind.MAIN ? "menu.principal.titre" : "menu.types.titre";
-        inventory = Bukkit.createInventory(this, SIZE, Messages.chat(m.text(titleKey, "nom", name)));
-        ItemStack filler = item(kind == Kind.MAIN ? s.mainFiller : s.typesFiller, " ", List.of());
-        for (int slot = 0; slot < SIZE; slot++) {
-            inventory.setItem(slot, filler);
+        String menu = kind == Kind.MAIN ? "menu.principal." : "menu.types.";
+        Settings.Frame frame = kind == Kind.MAIN ? s.mainFrame : s.typesFrame;
+        inventory = Bukkit.createInventory(this, frame.size(), Messages.chat(m.text(menu + "titre", "nom", name)));
+        if (frame.fill() != null) {
+            for (int slot = 0; slot < frame.size(); slot++) {
+                put(slot, pane(frame.fill()));
+            }
+        }
+        panes(frame.ring(), frame.ringSlots());
+        panes(frame.accent(), frame.accentSlots());
+        if (frame.headSlot() >= 0) {
+            put(frame.headSlot(), item(Icons.make(frame.headIcon()), m.text(menu + "jake.nom", "nom", name),
+                    m.lines(menu + "jake.description", "nom", name, "type", m.typeName(d.type()))));
         }
         if (kind == Kind.MAIN) {
             buildMain(player, d, name);
@@ -77,11 +83,6 @@ final class JakeMenu implements InventoryHolder {
     private void buildMain(Player player, JakeData d, String name) {
         Messages m = plugin.messages();
         Settings s = plugin.settings();
-        ItemStack gray = item(s.mainGray, " ", List.of());
-        for (int slot : s.mainGraySlots) {
-            put(slot, gray);
-        }
-
         List<String> typeLines = new ArrayList<>();
         boolean otherAllowed = false;
         for (Settings.TypeSettings type : s.types.values()) {
@@ -106,10 +107,12 @@ final class JakeMenu implements InventoryHolder {
         Material icon = current != null ? current.icon() : Material.VILLAGER_SPAWN_EGG;
         put(s.typeSlot, item(icon, m.text("menu.principal.type.nom", "nom", name), lore));
 
-        String state = m.text(d.visible() ? "menu.principal.visibilite.etat-visible" : "menu.principal.visibilite.etat-cache");
+        String state = d.visible() ? "visible" : "cache";
         put(s.visibilitySlot, item(d.visible() ? s.visibleMaterial : s.hiddenMaterial,
                 m.text("menu.principal.visibilite.nom", "nom", name),
-                m.lines("menu.principal.visibilite.description", "nom", name, "etat", state)));
+                m.lines("menu.principal.visibilite.description", "nom", name,
+                        "etat", m.text("menu.principal.visibilite.etat-" + state, "nom", name),
+                        "action", m.text("menu.principal.visibilite.action-" + state, "nom", name))));
 
         put(s.positionSlot, item(s.positionMaterial, m.text("menu.principal.position.nom", "nom", name),
                 m.lines("menu.principal.position.description", "nom", name)));
@@ -165,8 +168,7 @@ final class JakeMenu implements InventoryHolder {
                 player.closeInventory();
                 plugin.commands().startMove(player, jake);
             } else if (slot == s.backSlot && !back.isEmpty()) {
-                player.closeInventory();
-                player.performCommand(back);
+                goBack(player);
             }
             return;
         }
@@ -180,14 +182,43 @@ final class JakeMenu implements InventoryHolder {
         }
     }
 
+    /** Le menu de la commande remplace celui-ci ; si elle n'en ouvre pas, celui-ci se ferme. */
+    private void goBack(Player player) {
+        player.performCommand(back);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline() && player.getOpenInventory().getTopInventory().getHolder(false) == this) {
+                player.closeInventory();
+            }
+        }, plugin.settings().closeTicks);
+    }
+
     private void put(int slot, ItemStack item) {
-        if (slot >= 0 && slot < SIZE) {
+        if (slot >= 0 && slot < inventory.getSize()) {
             inventory.setItem(slot, item);
         }
     }
 
+    private void panes(Material material, List<Integer> slots) {
+        if (material != null) {
+            for (int slot : slots) {
+                put(slot, pane(material));
+            }
+        }
+    }
+
+    private static ItemStack pane(Material material) {
+        ItemStack stack = item(material, " ", List.of());
+        ItemMeta meta = stack.getItemMeta();
+        meta.setHideTooltip(true);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
     private static ItemStack item(Material material, String name, List<String> lore) {
-        ItemStack stack = new ItemStack(material);
+        return item(new ItemStack(material), name, lore);
+    }
+
+    private static ItemStack item(ItemStack stack, String name, List<String> lore) {
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Messages.item(name));
         List<Component> lines = new ArrayList<>(lore.size());

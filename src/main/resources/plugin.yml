@@ -9,12 +9,13 @@ depend:
   - FancyNpcs
 softdepend:
   - FancyHolograms
+  - HeadDatabase
   - PlaceholderAPI
 
 commands:
   jake:
-    description: Paramètres de Jake, le PNJ de votre île.
-    usage: /<command> [deplacer|visibilite|type]
+    description: Jake, le PNJ de votre île, et ses réglages.
+    usage: /<command> [reglages|deplacer|visibilite|type]
     aliases:
       - jack
       - islandnpc
@@ -25,7 +26,7 @@ commands:
 
 permissions:
   shislandjake.use:
-    description: Ouvrir les paramètres de Jake (/jake, /is jake) et choisir son type.
+    description: Ouvrir Jake et ses réglages (/jake, /is jake) et choisir son apparence.
     default: true
   shislandjake.deplacer:
     description: Déplacer Jake sur son île (/jake deplacer).

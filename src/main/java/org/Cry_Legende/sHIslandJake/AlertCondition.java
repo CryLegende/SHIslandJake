@@ -9,12 +9,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Lit le placeholder de l'alerte (alerte.placeholder) pour un joueur, au plus une fois par alerte.verification-ticks.
- * Sans PlaceholderAPI, l'alerte ne s'affiche jamais. Fil principal.
+ * Ce que l'alerte au-dessus de Jake dit à un joueur : les lignes « alerte » de messages.yml, quand alerte.placeholder vaut
+ * alerte.valeur pour lui. Lu au plus une fois par alerte.verification-ticks. Sans PlaceholderAPI, il n'y a jamais d'alerte.
+ * Fil principal.
  */
 final class AlertCondition {
 
-    private record Cached(boolean shows, int untilTick) {
+    private record Cached(String text, int untilTick) {
     }
 
     private final SHIslandJake plugin;
@@ -24,19 +25,32 @@ final class AlertCondition {
         this.plugin = plugin;
     }
 
-    boolean shows(Player player) {
+    /** Lignes séparées par des retours à la ligne ; vide = pas d'alerte. */
+    String text(Player player) {
         Settings s = plugin.settings();
         if (!s.alertEnabled || s.alertPlaceholder.isEmpty() || !Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            return false;
+            return "";
         }
         int now = Bukkit.getCurrentTick();
         Cached c = cache.get(player.getUniqueId());
         if (c != null && now < c.untilTick()) {
-            return c.shows();
+            return c.text();
         }
-        boolean shows = PlaceholderAPI.setPlaceholders(player, s.alertPlaceholder).trim().equalsIgnoreCase(s.alertValue);
-        cache.put(player.getUniqueId(), new Cached(shows, now + s.alertCheckTicks));
-        return shows;
+        String text = PlaceholderAPI.setPlaceholders(player, s.alertPlaceholder).trim().equalsIgnoreCase(s.alertValue)
+                ? lines(player) : "";
+        cache.put(player.getUniqueId(), new Cached(text, now + s.alertCheckTicks));
+        return text;
+    }
+
+    private String lines(Player player) {
+        StringBuilder out = new StringBuilder();
+        for (String raw : plugin.messages().lines("alerte")) {
+            String line = raw.indexOf('%') >= 0 ? PlaceholderAPI.setPlaceholders(player, raw) : raw;
+            if (!line.isBlank()) {
+                out.append(out.isEmpty() ? "" : "\n").append(line);
+            }
+        }
+        return out.toString();
     }
 
     void forget(Player player) {

@@ -5,6 +5,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -13,12 +15,16 @@ import java.util.UUID;
  */
 final class Jake {
 
+    /** Hologramme d'alerte d'un joueur (gardé en Object, comme l'autre) et le texte qu'il montre. */
+    record Alert(Object hologram, String text) {
+    }
+
     private volatile JakeData data;
     private Npc handle;
     /** Hologramme FancyHolograms, gardé en Object pour que le plugin tourne sans FancyHolograms. */
     private Object hologram;
-    /** Ligne d'alerte au-dessus de l'hologramme (« ! »), créée au premier joueur qui doit la voir. */
-    private Object alertHologram;
+    /** Ligne d'alerte de chaque joueur qui en voit une : son texte n'est pas le même pour tous. */
+    private final Map<UUID, Alert> alerts = new HashMap<>();
     private long lastSeen;
 
     Jake(JakeData data) {
@@ -60,12 +66,8 @@ final class Jake {
         this.hologram = hologram;
     }
 
-    Object alertHologram() {
-        return alertHologram;
-    }
-
-    void setAlertHologram(Object alertHologram) {
-        this.alertHologram = alertHologram;
+    Map<UUID, Alert> alerts() {
+        return alerts;
     }
 
     long lastSeen() {
