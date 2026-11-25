@@ -73,7 +73,8 @@ final class IslandSubCommand implements SuperiorCommand {
 
     @Override
     public List<String> tabComplete(SuperiorSkyblock superiorSkyblock, CommandSender sender, String[] args) {
-        return plugin.commands().playerTab(sender, after(args));
+        String[] rest = after(args);
+        return rest.length == 0 ? List.of() : plugin.commands().playerTab(sender, rest);
     }
 
     /** Ce qui suit « /is jake ». */
