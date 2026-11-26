@@ -11,7 +11,8 @@ final class Mesures {
         SUIVI("suivi"),
         REGARD("regard"),
         REACTIONS("reactions"),
-        BULLES("bulles");
+        BULLES("bulles"),
+        VIE("vie");
 
         final String cle;
 

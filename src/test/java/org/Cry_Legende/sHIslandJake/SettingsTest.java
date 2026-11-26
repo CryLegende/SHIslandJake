@@ -47,6 +47,7 @@ class SettingsTest {
         assertEquals("defaut", types.get("VILLAGER").caractere());
         assertEquals("shislandjake.type.villager", types.get("VILLAGER").permission());
         assertTrue(types.get("VILLAGER").scenes().isEmpty());
+        assertTrue(types.get("VILLAGER").vie().isEmpty());
         assertTrue(avertissements.isEmpty(), avertissements.toString());
     }
 
@@ -64,6 +65,10 @@ class SettingsTest {
                       - carte
                       - sac
                       - somnole
+                    vie:
+                      - respire
+                      - " respire2 "
+                      - ""
                     sons:
                       bonjour: ENTITY_VILLAGER_YES
                       joie: entity.villager.celebrate
@@ -77,6 +82,7 @@ class SettingsTest {
         assertTrue(Double.isNaN(a.hauteur()), "hauteur d'après le dessin du modèle");
         assertTrue(Double.isNaN(a.zoneLargeur()));
         assertEquals(List.of("carte", "sac", "somnole"), a.scenes());
+        assertEquals(List.of("respire", "respire2"), a.vie());
         // un son en majuscules n'est pas un nom de son : retiré, avec un avertissement
         assertFalse(a.sons().containsKey("bonjour"));
         assertEquals("entity.villager.celebrate", a.sons().get("joie"));

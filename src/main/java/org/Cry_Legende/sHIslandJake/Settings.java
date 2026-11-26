@@ -31,7 +31,7 @@ public final class Settings {
      */
     public record Apparence(String id, String modele, float taille, EntityType mob, Material icon, double hauteur,
                             double zoneLargeur, double zoneHauteur, String permission, String caractere,
-                            Map<String, String> sons, List<String> scenes) {
+                            Map<String, String> sons, List<String> scenes, List<String> vie) {
 
         public boolean estModele() {
             return !modele.isEmpty();
@@ -58,7 +58,7 @@ public final class Settings {
 
     /** Apparence de secours quand la configuration n'en a aucune dessinable par FancyNpcs. */
     private static final Apparence VILLAGEOIS = new Apparence("VILLAGER", "", 1f, EntityType.VILLAGER,
-            Material.VILLAGER_SPAWN_EGG, 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of(), List.of());
+            Material.VILLAGER_SPAWN_EGG, 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of(), List.of(), List.of());
 
     public final String defaultType;
     public final boolean defaultVisible;
@@ -143,6 +143,9 @@ public final class Settings {
     public final int modelRetryTicks;
 
     public final boolean ambianceEnabled;
+    /** Animations de vie (types.<ID>.vie) enchaînées pour le joueur qui regarde Jake ; aussi pour un joueur discret. */
+    public final boolean vieEnabled;
+    public final boolean vieSiDiscret;
     public final double ambianceDistance;
     /** Cosinus de « angle-vue » : Jake est devant le joueur quand le cosinus de l'angle est au moins celui-là. */
     public final double ambianceCosine;
@@ -222,6 +225,8 @@ public final class Settings {
         modelRetryTicks = (int) Math.max(20, Math.round(c.getDouble("apparences.reessai-modele-secondes", 60) * 20));
 
         ambianceEnabled = c.getBoolean("ambiance.actif", true);
+        vieEnabled = c.getBoolean("ambiance.vie-actif", true);
+        vieSiDiscret = c.getBoolean("ambiance.vie-si-discret", true);
         ambianceDistance = Math.max(1, c.getDouble("ambiance.distance", 10));
         ambianceCosine = Math.cos(Math.toRadians(Math.min(180, Math.max(0, c.getDouble("ambiance.angle-vue", 70)))));
         ambiancePauseMinTicks = (int) Math.round(Math.max(0, c.getDouble("ambiance.pause-min-secondes", 15)) * 20);
@@ -439,7 +444,7 @@ public final class Settings {
                 icon = Material.VILLAGER_SPAWN_EGG;
             }
             result.put(b.id(), new Apparence(b.id(), b.modele(), b.taille(), mob, icon, b.hauteur(), b.zoneLargeur(),
-                    b.zoneHauteur(), b.permission(), b.caractere(), b.sons(), b.scenes()));
+                    b.zoneHauteur(), b.permission(), b.caractere(), b.sons(), b.scenes(), b.vie()));
         }
         if (result.isEmpty()) {
             log.warning("Aucune apparence lisible dans « types » : seul VILLAGER est proposé.");

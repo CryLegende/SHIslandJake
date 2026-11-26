@@ -280,7 +280,7 @@ final class JakeDisplay {
         }
         if (signales.add("animation/" + a.modele() + "/" + animation)) {
             plugin.getLogger().warning("Apparence " + a.id() + " : l'animation « " + animation + " » n'existe pas dans le modèle « "
-                    + a.modele() + " » (types." + a.id() + ".scenes).");
+                    + a.modele() + " » (types." + a.id() + ".scenes ou vie).");
         }
         return false;
     }

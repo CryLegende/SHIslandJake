@@ -11,9 +11,10 @@
 #  vue par le seul joueur concerné : un geste du modèle, une réplique dans une
 #  bulle au-dessus de Jake, un son, des particules (voir « reactions »).
 #
-#  Un personnage dessiné par un modèle vit aussi par de courtes scènes
-#  d'ambiance (« ambiance ») : une animation jouée pour un joueur proche qui a
-#  Jake devant lui, quand rien d'autre ne se passe pour lui.
+#  Un personnage dessiné par un modèle vit aussi pour le joueur proche qui l'a
+#  devant lui (« ambiance ») : il respire et bouge un peu sans arrêt (« vie »),
+#  et joue de temps en temps une courte scène quand rien d'autre ne se passe
+#  pour lui.
 #
 #  Le corps de Jake vient de son apparence (« types ») : un modèle de
 #  BlockDisplayCreator (« modele ») ou, en secours, un mob dessiné par
@@ -53,7 +54,8 @@
 #                                   n'ont pas encore de Jake
 #    /shislandjake stats            durée des tâches de Jake sur la dernière minute
 #                                   (le temps des réactions d'approche et des scènes
-#                                   d'ambiance est compté aussi dans « suivi »)
+#                                   d'ambiance est compté aussi dans « suivi » ; « vie »
+#                                   = les animations de vie enchaînées)
 #    /shislandjake react <joueur> <réaction> [texte]
 #                                   joue une réaction pour ce joueur (le texte
 #                                   remplace la réplique) ; ne répond rien, qu'elle
@@ -318,15 +320,24 @@ apparences:
 # passe pour lui (bulle, réaction en cours ou en attente, pause). Une scène au hasard, jamais deux fois de suite la
 # même ; après chaque scène ou réaction, une pause tirée entre pause-min-secondes et pause-max-secondes. Une réaction
 # passe devant une scène ; une scène n'interrompt rien. Pour les membres comme pour les visiteurs.
+#
+# Animations de vie (types.<apparence>.vie : respirer, petits mouvements, qui partent de la pose de repos et y
+# reviennent) : tant que ce joueur a Jake devant lui, à moins de « distance » blocs, elles s'enchaînent pour lui sans
+# trou, tirées au hasard (jamais deux fois de suite la même ; seule, elle se répète). Une scène ou le geste d'une
+# réaction la remplace, la vie reprend à sa fin ; la pause entre deux scènes compte pendant la vie. Quand il se
+# détourne ou s'éloigne, l'animation en cours finit et rien n'est relancé ; ça repart quand il regarde de nouveau Jake.
 ambiance:
   actif: true
   distance: 10
   angle-vue: 70
   pause-min-secondes: 15
   pause-max-secondes: 30
+  vie-actif: true
+  # « Jake discret » (/jake discret) : la vie continue (true) ; jamais de scène ni de réaction pour lui.
+  vie-si-discret: true
   # Durée d'une animation (scène ou réaction) quand le moteur ne la donne pas : « durees.<modèle>.<animation> » en
   # secondes (deux modèles peuvent avoir une animation du même nom), sinon celle-ci. Une scène absente du fichier du
-  # modèle est signalée en console, une fois, et n'est pas jouée.
+  # modèle est signalée en console, une fois, et n'est pas jouée (de même pour une animation de vie).
   duree-defaut-secondes: 8
   durees:
 
@@ -340,6 +351,7 @@ ambiance:
 #   caractere   jeu de répliques (messages.yml, repliques.<caractère>) ; absent = defaut
 #   sons        son de chaque réaction pour cette apparence (quand la réaction n'a pas de « son »)
 #   scenes      animations d'ambiance de ce modèle (voir « ambiance »)
+#   vie         animations de vie de ce modèle, enchaînées sans arrêt pour le joueur qui regarde Jake (voir « ambiance »)
 # Exemple d'apparence dessinée par BlockDisplayCreator :
 #   AVENTURIER:
 #     modele: jake_aventurier
@@ -349,6 +361,9 @@ ambiance:
 #     scenes:
 #       - carte
 #       - sac
+#     vie:
+#       - respire
+#       - respire2
 #     sons:
 #       bonjour: entity.villager.ambient
 types:

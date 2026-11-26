@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,10 @@ final class Reactions {
     private final Ambiance ambiance = new Ambiance(new Random());
     private final Map<String, Particle> particules = new HashMap<>();
     private final Signalements erreurs = new Signalements();
+    /** Jake que chaque joueur regarde (près, de face), lu au dernier passage lent du suivi. */
+    private final Map<UUID, Jake> regarde = new HashMap<>();
+    /** Animation de vie suivante de chaque joueur : une tâche à la fin de l'animation en cours, rien par tick. */
+    private final Map<UUID, BukkitTask> chaines = new HashMap<>();
 
     Reactions(SHIslandJake plugin) {
         this.plugin = plugin;
@@ -206,8 +211,8 @@ final class Reactions {
         }
         int tick = Bukkit.getCurrentTick();
         if (plugin.display().jouer(jake, s.clickAnimation, player)) {
-            ambiance.reaction(id, tick, plugin.display().duree(jake, s.clickAnimation),
-                    ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
+            int duree = plugin.display().duree(jake, s.clickAnimation);
+            ambiance.reaction(id, tick, duree, duree, ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
         }
     }
 
@@ -222,6 +227,11 @@ final class Reactions {
         boolean geste = plugin.display().jouer(jake, r.animation(), player);
         if (!geste && ambiance.enScene(id, tick)) {
             plugin.display().arreter(jake, player);
+            // scène arrêtée sans geste à la place : la vie reprend tout de suite
+            ambiance.sceneArretee(id, tick);
+            if (regarde.get(id) == jake && plugin.settings().vieEnabled) {
+                vivre(player, jake);
+            }
         }
         String ligne = texte != null && !texte.isBlank() ? jetons(player, jake, texte) : replique(player, jake, r);
         int dureeBulle = ligne == null ? 0 : plugin.textes().bulle(player, jake, vue, ligne);
@@ -229,9 +239,10 @@ final class Reactions {
         if (geste || dureeBulle > 0 || effet) {
             son(player, jake, r);
             pauses.poser(id, r.nom(), System.currentTimeMillis(), r.pauseMillis());
-            int duree = Math.max(dureeBulle, geste ? plugin.display().duree(jake, r.animation()) : 0);
+            int dureeGeste = geste ? plugin.display().duree(jake, r.animation()) : 0;
             Settings s = plugin.settings();
-            ambiance.reaction(id, tick, duree, ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
+            ambiance.reaction(id, tick, Math.max(dureeBulle, dureeGeste), dureeGeste,
+                    ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
         }
     }
 
@@ -239,7 +250,7 @@ final class Reactions {
         int duree = plugin.textes().bulle(player, jake, vue, texte);
         if (duree > 0) {
             Settings s = plugin.settings();
-            ambiance.reaction(player.getUniqueId(), Bukkit.getCurrentTick(), duree,
+            ambiance.reaction(player.getUniqueId(), Bukkit.getCurrentTick(), duree, 0,
                     ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
         }
     }
@@ -316,15 +327,17 @@ final class Reactions {
     //AMBIANCE----------
 
     /**
-     * Passage du suivi : une scène d'ambiance pour ce joueur s'il est près d'un Jake dessiné par un modèle qui a des
-     * scènes, l'a devant lui, et que rien d'autre ne se passe pour lui (bulle, réaction en cours ou en attente, pause).
+     * Passage du suivi : le Jake que ce joueur regarde (près, dessiné par un modèle, devant lui). Une scène d'ambiance
+     * s'il n'est pas discret et que rien d'autre ne se passe pour lui (bulle, réaction en cours ou en attente, pause),
+     * et la vie de Jake si elle ne joue pas déjà pour lui. S'il ne regarde plus Jake, l'animation de vie en cours finit
+     * et rien n'est relancé.
      */
     void ambiance(Player player, Map<Jake, Textes.Vue> vues, Location ici) {
         Settings s = plugin.settings();
         UUID id = player.getUniqueId();
         int tick = Bukkit.getCurrentTick();
-        if (!s.ambianceEnabled || vues == null || !ambiance.libre(id, tick) || plugin.discret().est(id)
-                || plugin.textes().parle(id) || attentes.contient(id)) {
+        if (!s.ambianceEnabled || vues == null) {
+            regarde.remove(id);
             return;
         }
         double max = s.ambianceDistance * s.ambianceDistance;
@@ -333,33 +346,102 @@ final class Reactions {
         for (Map.Entry<Jake, Textes.Vue> entry : vues.entrySet()) {
             Jake jake = entry.getKey();
             double d2 = entry.getValue().distance2;
-            if (d2 <= max && d2 < best && plugin.display().modele(jake) && !apparence(jake).scenes().isEmpty()) {
+            Settings.Apparence a = apparence(jake);
+            if (d2 <= max && d2 < best && plugin.display().modele(jake) && (!a.scenes().isEmpty() || !a.vie().isEmpty())) {
                 best = d2;
                 choisi = jake;
             }
         }
         if (choisi == null) {
-            return;
-        }
-        Jake jake = choisi;
-        List<String> scenes = apparence(choisi).scenes().stream().filter(sc -> plugin.display().animationConnue(jake, sc)).toList();
-        if (scenes.isEmpty()) {
+            regarde.remove(id);
             return;
         }
         JakeData d = choisi.data();
         double yeux = ici.getY() + player.getEyeHeight();
         if (!Ambiance.devant(ici.getX(), yeux, ici.getZ(), ici.getYaw(), ici.getPitch(),
                 d.x(), d.y() + choisi.hauteurTexte() * 0.5, d.z(), s.ambianceCosine)) {
+            regarde.remove(id);
+            return;
+        }
+        regarde.put(id, choisi);
+        scene(player, choisi, tick);
+        // la vie : elle part si rien ne la fait déjà vivre (animation en cours ou suite prévue)
+        if (s.vieEnabled && !ambiance.enVie(id, tick) && !chaines.containsKey(id)) {
+            long start = plugin.mesures().debut();
+            vivre(player, choisi);
+            plugin.mesures().fin(Mesures.Tache.VIE, start);
+        }
+    }
+
+    /** Une scène d'ambiance pour ce joueur, si elle peut partir. */
+    private void scene(Player player, Jake jake, int tick) {
+        Settings s = plugin.settings();
+        UUID id = player.getUniqueId();
+        if (!ambiance.libre(id, tick) || plugin.discret().est(id) || plugin.textes().parle(id) || attentes.contient(id)) {
+            return;
+        }
+        List<String> scenes = apparence(jake).scenes().stream().filter(sc -> plugin.display().animationConnue(jake, sc)).toList();
+        if (scenes.isEmpty()) {
             return;
         }
         String scene = ambiance.tirer(id, scenes);
         int pause = ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks);
-        if (scene != null && plugin.display().jouer(choisi, scene, player)) {
-            ambiance.scene(id, scene, tick, plugin.display().duree(choisi, scene), pause);
+        if (plugin.display().jouer(jake, scene, player)) {
+            ambiance.scene(id, scene, tick, plugin.display().duree(jake, scene), pause);
         } else {
-            // scène absente du modèle : pas de nouvel essai avant la pause
+            // scène refusée par le moteur : pas de nouvel essai avant la pause
             ambiance.scene(id, scene, tick, 0, pause);
         }
+    }
+
+    /**
+     * La vie de Jake pour ce joueur : une animation de vie tout de suite, ou à la fin de la scène ou du geste qui joue,
+     * ou plus rien s'il ne regarde plus ce Jake. La suivante est prévue à la fin exacte de celle-ci (sans trou).
+     */
+    private void vivre(Player player, Jake jake) {
+        Settings s = plugin.settings();
+        UUID id = player.getUniqueId();
+        BukkitTask prevue = chaines.remove(id);
+        if (prevue != null) {
+            prevue.cancel();
+        }
+        int tick = Bukkit.getCurrentTick();
+        boolean vu = player.isOnline() && regarde.get(id) == jake && plugin.display().modele(jake);
+        boolean permise = s.vieEnabled && (s.vieSiDiscret || !plugin.discret().est(id));
+        switch (ambiance.decider(id, tick, vu, permise)) {
+            case ARRETER -> ambiance.finVie(id);
+            case ATTENDRE -> planifier(player, jake, ambiance.reprise(id) - tick);
+            case JOUER -> {
+                List<String> vie = apparence(jake).vie().stream().filter(v -> plugin.display().animationConnue(jake, v)).toList();
+                String animation = ambiance.tirerVie(id, vie);
+                if (animation != null && plugin.display().jouer(jake, animation, player)) {
+                    int duree = plugin.display().duree(jake, animation);
+                    ambiance.vie(id, animation, tick, duree);
+                    planifier(player, jake, duree);
+                } else {
+                    ambiance.finVie(id);
+                }
+            }
+        }
+    }
+
+    private void planifier(Player player, Jake jake, int ticks) {
+        UUID id = player.getUniqueId();
+        BukkitTask avant = chaines.remove(id);
+        if (avant != null) {
+            avant.cancel();
+        }
+        chaines.put(id, Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            long start = plugin.mesures().debut();
+            try {
+                vivre(player, jake);
+            } catch (RuntimeException e) {
+                chaines.remove(id);
+                signaler("vie", "Vie de Jake pour " + player.getName() + " impossible", e);
+            } finally {
+                plugin.mesures().fin(Mesures.Tache.VIE, start);
+            }
+        }, Math.max(1, ticks)));
     }
 
     //OUTILS----------
@@ -415,6 +497,11 @@ final class Reactions {
         attentes.oublier(player);
         repliques.oublier(player);
         ambiance.oublier(player);
+        regarde.remove(player);
+        BukkitTask chaine = chaines.remove(player);
+        if (chaine != null) {
+            chaine.cancel();
+        }
     }
 
     /** Ménage des pauses finies et des attentes dépassées. */

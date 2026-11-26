@@ -9,6 +9,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AmbianceTest {
@@ -60,7 +61,7 @@ class AmbianceTest {
         UUID j = UUID.randomUUID();
         a.scene(j, "carte", 0, 160, 300);
         assertTrue(a.enScene(j, 10));
-        a.reaction(j, 10, 60, 300);
+        a.reaction(j, 10, 60, 60, 300);
         assertFalse(a.enScene(j, 11), "la réaction a remplacé la scène");
         assertFalse(a.libre(j, 400), "pause après la réaction");
         assertTrue(a.libre(j, 460));
@@ -72,11 +73,122 @@ class AmbianceTest {
         Ambiance a = new Ambiance(new Random(2));
         UUID j = UUID.randomUUID();
         a.scene(j, "carte", 0, 160, 300);
-        a.reaction(j, 20, 34, 300);
+        a.reaction(j, 20, 34, 34, 300);
         assertFalse(a.enScene(j, 21), "une réaction suivante ne croit plus à une scène en cours");
         assertFalse(a.libre(j, 30), "pas de scène pendant le geste du clic");
         // la pause la plus longue des deux (scène coupée, geste) est gardée
         assertFalse(a.libre(j, 459));
         assertTrue(a.libre(j, 460));
+    }
+
+    //VIE----------
+
+    @Test
+    void laVieSEnchaineSansTrou() {
+        Ambiance a = new Ambiance(new Random(4));
+        UUID j = UUID.randomUUID();
+        List<String> vie = List.of("respire", "respire2");
+        int t = 0;
+        String avant = null;
+        for (int i = 0; i < 50; i++) {
+            assertEquals(Ambiance.Vie.JOUER, a.decider(j, t, true, true));
+            String v = a.tirerVie(j, vie);
+            assertNotEquals(avant, v, "jamais deux fois de suite la même");
+            a.vie(j, v, t, 240);
+            assertTrue(a.enVie(j, t + 239));
+            // la suivante part au tick même où celle-ci finit
+            assertFalse(a.enVie(j, t + 240));
+            t += 240;
+            avant = v;
+        }
+    }
+
+    @Test
+    void uneSeuleAnimationDeVieSeRepete() {
+        Ambiance a = new Ambiance(new Random(5));
+        UUID j = UUID.randomUUID();
+        for (int i = 0; i < 5; i++) {
+            String v = a.tirerVie(j, List.of("respire"));
+            assertEquals("respire", v);
+            a.vie(j, v, i * 200, 200);
+        }
+        assertNull(a.tirerVie(j, List.of()));
+    }
+
+    @Test
+    void sceneEtReactionPassentDevantLaVie() {
+        Ambiance a = new Ambiance(new Random(6));
+        UUID j = UUID.randomUUID();
+        a.vie(j, "respire", 0, 240);
+        // une scène à 100 remplace la vie ; à la fin prévue de la vie (240), on attend la fin de la scène (100 + 160)
+        a.scene(j, "carte", 100, 160, 300);
+        assertFalse(a.enVie(j, 101), "la scène a remplacé la vie");
+        assertEquals(Ambiance.Vie.ATTENDRE, a.decider(j, 240, true, true));
+        assertEquals(260, a.reprise(j));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 260, true, true));
+        a.vie(j, "respire2", 260, 240);
+        // le geste d'une réaction (34 ticks) remplace la vie ; elle reprend à sa fin
+        a.reaction(j, 300, 34, 34, 300);
+        assertFalse(a.enVie(j, 301));
+        assertEquals(Ambiance.Vie.ATTENDRE, a.decider(j, 320, true, true));
+        assertEquals(334, a.reprise(j));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 334, true, true));
+        // une réaction sans geste (bulle seule) laisse la vie jouer
+        a.vie(j, "respire", 334, 240);
+        a.reaction(j, 400, 80, 0, 300);
+        assertTrue(a.enVie(j, 401));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 574, true, true));
+    }
+
+    @Test
+    void unGesteQuiRemplaceUneSceneRendLaVieASaFin() {
+        Ambiance a = new Ambiance(new Random(7));
+        UUID j = UUID.randomUUID();
+        a.scene(j, "carte", 0, 160, 300);
+        a.reaction(j, 10, 60, 20, 300);
+        assertEquals(30, a.reprise(j), "la scène coupée ne retient plus la vie");
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 30, true, true));
+    }
+
+    @Test
+    void sceneArreteeLaVieRepartTouteDeSuite() {
+        Ambiance a = new Ambiance(new Random(8));
+        UUID j = UUID.randomUUID();
+        a.scene(j, "sac", 0, 160, 300);
+        assertEquals(Ambiance.Vie.ATTENDRE, a.decider(j, 50, true, true));
+        a.sceneArretee(j, 50);
+        assertFalse(a.enScene(j, 51));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 50, true, true));
+        // la pause des scènes continue de compter
+        assertFalse(a.libre(j, 200));
+    }
+
+    @Test
+    void detourneOuDiscretRienNEstRelance() {
+        Ambiance a = new Ambiance(new Random(9));
+        UUID j = UUID.randomUUID();
+        a.vie(j, "respire", 0, 240);
+        // à la fin de l'animation, le joueur ne regarde plus Jake : rien
+        assertEquals(Ambiance.Vie.ARRETER, a.decider(j, 240, false, true));
+        a.finVie(j);
+        assertFalse(a.enVie(j, 241));
+        // même pendant une scène : il s'est détourné, rien n'attend sa fin
+        a.scene(j, "carte", 300, 160, 300);
+        assertEquals(Ambiance.Vie.ARRETER, a.decider(j, 310, false, true));
+        // discret sans vie-si-discret : la vie ne joue pas
+        assertEquals(Ambiance.Vie.ARRETER, a.decider(j, 500, true, false));
+        // il regarde de nouveau : ça repart
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 500, true, true));
+    }
+
+    @Test
+    void lAnimationDeVieNeTouchePasALaPauseDesScenes() {
+        Ambiance a = new Ambiance(new Random(10));
+        UUID j = UUID.randomUUID();
+        a.scene(j, "carte", 0, 100, 300);
+        a.vie(j, "respire", 100, 240);
+        a.vie(j, "respire2", 340, 240);
+        assertTrue(a.libre(j, 400), "la pause s'est écoulée pendant la vie");
+        assertTrue(a.enVie(j, 400));
     }
 }

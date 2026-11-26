@@ -21,7 +21,7 @@ final class ApparencesLues {
     /** Une apparence telle qu'écrite ; {@code hauteur} et la zone valent NaN quand elles doivent venir du dessin. */
     record Brute(String id, String modele, float taille, String mob, String icone, double hauteur, double zoneLargeur,
                  double zoneHauteur, String permission, String caractere, Map<String, String> sons,
-                 List<String> scenes) {
+                 List<String> scenes, List<String> vie) {
 
         boolean estModele() {
             return !modele.isEmpty();
@@ -66,11 +66,17 @@ final class ApparencesLues {
                     scenes.add(scene.trim());
                 }
             }
+            List<String> vie = new ArrayList<>();
+            for (String animation : entry.getStringList("vie")) {
+                if (!animation.isBlank()) {
+                    vie.add(animation.trim());
+                }
+            }
             String caractere = entry.getString("caractere", "defaut").trim();
             result.put(id, new Brute(id, modele, (float) Math.max(0.05, entry.getDouble("taille", 1.0)), mob,
                     entry.getString("icone", "VILLAGER_SPAWN_EGG"), hauteur, zoneLargeur, zoneHauteur,
                     entry.getString("permission", "").trim(), caractere.isEmpty() ? "defaut" : caractere,
-                    Map.copyOf(sons), List.copyOf(scenes)));
+                    Map.copyOf(sons), List.copyOf(scenes), List.copyOf(vie)));
         }
         return result;
     }

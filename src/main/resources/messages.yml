@@ -83,6 +83,7 @@ stats:
   regard: Regard de Jake
   reactions: Réactions
   bulles: Bulles
+  vie: Vie de Jake
 
 # Ce qui dessine un Jake, dans /shislandjake info <joueur>. {apparence} = apparence dessinée.
 corps:
