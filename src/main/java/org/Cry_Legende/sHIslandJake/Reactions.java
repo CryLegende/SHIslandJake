@@ -366,7 +366,7 @@ final class Reactions {
         regarde.put(id, choisi);
         scene(player, choisi, tick);
         // la vie : elle part si rien ne la fait déjà vivre (animation en cours ou suite prévue)
-        if (s.vieEnabled && !ambiance.enVie(id, tick) && !chaines.containsKey(id)) {
+        if (s.vieEnabled && !apparence(choisi).vie().isEmpty() && !ambiance.enVie(id, tick) && !chaines.containsKey(id)) {
             long start = plugin.mesures().debut();
             vivre(player, choisi);
             plugin.mesures().fin(Mesures.Tache.VIE, start);
