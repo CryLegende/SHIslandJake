@@ -199,11 +199,12 @@ final class Reactions {
     private void jouer(Player player, Jake jake, Textes.Vue vue, ReglagesReactions.Reaction r, String texte) {
         UUID id = player.getUniqueId();
         int tick = Bukkit.getCurrentTick();
-        // une réaction passe devant une scène d'ambiance
-        if (ambiance.enScene(id, tick)) {
+        // une réaction passe devant une scène d'ambiance : son geste remplace la scène (le moteur ramène les pièces au
+        // repos en douceur) ; sans geste, la scène est arrêtée
+        boolean geste = plugin.display().jouer(jake, r.animation(), player);
+        if (!geste && ambiance.enScene(id, tick)) {
             plugin.display().arreter(jake, player);
         }
-        boolean geste = plugin.display().jouer(jake, r.animation(), player);
         String ligne = texte != null && !texte.isBlank() ? jetons(player, jake, texte) : replique(player, jake, r);
         int dureeBulle = ligne == null ? 0 : plugin.textes().bulle(player, jake, vue, ligne);
         boolean effet = particules(player, jake, r);
