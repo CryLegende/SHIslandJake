@@ -18,8 +18,10 @@ trois temps : le fichier du modèle, sa déclaration dans config.yml, ses textes
 
 Le fichier du modèle
 
-Posez le fichier (par exemple JAKE_arbre.yml) dans plugins/BlockDisplayCreator/custom-blocks/,
-puis tapez /bdc reload JAKE_arbre. Le nom du fichier sans « .yml » est le nom du modèle.
+Posez le fichier (par exemple JAKE_arbre.yml) dans plugins/BlockDisplayCreator/custom-blocks/jake/,
+puis tapez /bdc reload (un nouveau fichier n'est lu que par ce rechargement complet). Une fois le
+modèle connu, /bdc reload JAKE_arbre suffit après un changement de son fichier. Le nom du fichier
+sans « .yml » est le nom du modèle.
 
 Les animations du modèle suivent quatre règles.
 
@@ -175,6 +177,7 @@ elle reste dans « types » pour dessiner Jake quand un modèle manque, sans jam
 ------------
 
   /shislandjake reload        relit config.yml et messages.yml.
-  /bdc reload <modèle>        relit le fichier d'un modèle après un changement.
+  /bdc reload                 relit tous les modèles ; obligatoire pour un nouveau fichier.
+  /bdc reload <modèle>        relit le fichier d'un modèle déjà connu après un changement.
   /shislandjake info <joueur> montre le Jake de l'île d'un joueur et ce qui le dessine.
   /shislandjake stats         montre ce que Jake coûte au serveur sur la dernière minute.
