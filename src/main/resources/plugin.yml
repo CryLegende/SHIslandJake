@@ -22,7 +22,7 @@ commands:
       - isnpc
   shislandjake:
     description: Administration de SHIslandJake.
-    usage: /<command> <reload|info|delete|import>
+    usage: /<command> <reload|info|delete|import|stats>
 
 permissions:
   shislandjake.use:
@@ -73,6 +73,7 @@ permissions:
       shislandjake.admin.info: true
       shislandjake.admin.delete: true
       shislandjake.admin.import: true
+      shislandjake.admin.stats: true
       shislandjake.bypass: true
       shislandjake.type.*: true
   shislandjake.admin.reload:
@@ -86,4 +87,7 @@ permissions:
     default: op
   shislandjake.admin.import:
     description: Reprendre les PNJ d'IslandNPC des îles qui n'ont pas encore de Jake (/shislandjake import).
+    default: op
+  shislandjake.admin.stats:
+    description: Durée des tâches de Jake sur la dernière minute (/shislandjake stats).
     default: op

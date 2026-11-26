@@ -47,6 +47,13 @@ chat:
   import: '&7&l« &a&lSH &8&l» &7IslandNPC : &a{importes} Jake repris&7, {presents} îles avaient déjà le leur.'
   import-absent: '&7&l« &c&lSH &8&l» &7Aucune base &cIslandNPC &7à reprendre (plugins/IslandNPC/database.db).'
   import-erreur: '&7&l« &c&lSH &8&l» &7La base &cIslandNPC &7n''a pas pu être lue (voir la console).'
+  # /shislandjake stats. {fenetre} = secondes mesurées (60 au plus), {joueurs} = joueurs en ligne.
+  stats-entete: '&7&l« &e&lSH &8&l» &7Jake sur les &e{fenetre} s &7dernières, &e{joueurs} &7joueurs en ligne :'
+  # {tache} ; {passages} ; {moyenne} et {max} en µs par passage ; {par-tick} en µs par tick ; {par-joueur} en µs par
+  # joueur en ligne et par tick.
+  stats-ligne: '&8 • &e{tache} &7: {passages} passages, moyenne &e{moyenne} µs&7, max &e{max} µs&7, &e{par-tick} µs&7/tick, &e{par-joueur} µs&7/joueur/tick'
+  # {dessines} = Jake dessinés en ce moment, {suivis} = joueurs qui ont un Jake près d'eux.
+  stats-pied: '&8 • &7Jake dessinés : &e{dessines}&7, joueurs suivis : &e{suivis}&7.'
 
 # Noms des sous-commandes affichés dans les lignes d'utilisation.
 sous-commandes:
@@ -54,6 +61,13 @@ sous-commandes:
   deplacer: deplacer
   visibilite: visibilite
   type: type
+
+# Noms des tâches dans /shislandjake stats.
+stats:
+  suivi: Suivi des joueurs
+  regard: Regard de Jake
+  reactions: Réactions
+  bulles: Bulles
 
 # Texte de %shislandjake_visible%, et de {visible} dans info-joueur.
 placeholders:

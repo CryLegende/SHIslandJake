@@ -149,9 +149,16 @@ final class JakeTracker {
     }
 
     private void refreshAll() {
+        long start = plugin.mesures().debut();
         for (Player player : Bukkit.getOnlinePlayers()) {
             refresh(player);
         }
+        plugin.mesures().fin(Mesures.Tache.SUIVI, start);
+    }
+
+    /** Joueurs qui ont au moins un Jake près d'eux. */
+    int watchedPlayers() {
+        return watched.size();
     }
 
     private void refresh(Player player) {
@@ -239,6 +246,12 @@ final class JakeTracker {
         if (looks.isEmpty()) {
             return;
         }
+        long start = plugin.mesures().debut();
+        turnAllNow();
+        plugin.mesures().fin(Mesures.Tache.REGARD, start);
+    }
+
+    private void turnAllNow() {
         Settings settings = plugin.settings();
         double enter = square(settings.lookDistance);
         double leave = square(settings.lookDistance + LOOK_HYSTERESIS);

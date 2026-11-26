@@ -39,6 +39,7 @@ public final class SHIslandJake extends JavaPlugin {
     private BukkitTask saveTask;
     private Thread mainThread;
     private long loadMillis;
+    private final Mesures mesures = new Mesures();
 
     @Override
     public void onEnable() {
@@ -299,5 +300,9 @@ public final class SHIslandJake extends JavaPlugin {
 
     JakeCommands commands() {
         return commands;
+    }
+
+    Mesures mesures() {
+        return mesures;
     }
 }

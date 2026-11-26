@@ -32,6 +32,7 @@
 #                                   départ au prochain /jake d'un membre
 #    /shislandjake import           reprend les PNJ d'IslandNPC des îles qui
 #                                   n'ont pas encore de Jake
+#    /shislandjake stats            durée des tâches de Jake sur la dernière minute
 #
 #  Permissions
 #    shislandjake.use             /jake, réglages, choix de l'apparence (tout le monde)
@@ -41,7 +42,7 @@
 #    shislandjake.type.*          tous les types de la configuration par défaut (op par défaut)
 #    shislandjake.bypass          cliquer sur le Jake de n'importe quelle île (op)
 #    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass et type.* (op)
-#    shislandjake.admin.<sous-commande>   reload, info, delete, import
+#    shislandjake.admin.<sous-commande>   reload, info, delete, import, stats
 #
 #  Placeholders (île du joueur)
 #    %shislandjake_type%          type de Jake (VILLAGER, WITCH...)

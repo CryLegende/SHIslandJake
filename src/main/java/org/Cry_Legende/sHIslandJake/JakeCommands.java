@@ -26,7 +26,7 @@ final class JakeCommands {
     private static final Set<String> VISIBILITY = Set.of("visibilite", "visibilité", "visibility");
     private static final Set<String> TYPE = Set.of("type", "mob");
     private static final Set<String> MENU = Set.of("menu", "reglages", "réglages", "settings");
-    private static final List<String> ADMIN = List.of("reload", "info", "delete", "import");
+    private static final List<String> ADMIN = List.of("reload", "info", "delete", "import", "stats");
     /** Anciennes sous-commandes d'administration de /islandnpc. */
     private static final Set<String> OLD_ADMIN = Set.of("reload", "about", "delete", "import", "info");
 
@@ -280,6 +280,7 @@ final class JakeCommands {
             case "info" -> info(sender, args);
             case "delete" -> delete(sender, args);
             case "import" -> plugin.importIslandNpc(sender);
+            case "stats" -> stats(sender);
             default -> {
             }
         }
@@ -310,6 +311,29 @@ final class JakeCommands {
         plugin.messages().send(sender, "info-joueur", "joueur", args[1], "type", d.type().name(), "monde", d.world(),
                 "x", format(d.x()), "y", format(d.y()), "z", format(d.z()),
                 "visible", plugin.messages().text(d.visible() ? "placeholders.visible" : "placeholders.cache"));
+    }
+
+    /** Coût des tâches de Jake sur la dernière minute. */
+    private void stats(CommandSender sender) {
+        Mesures mesures = plugin.mesures();
+        double fenetre = mesures.fenetreSecondes();
+        int joueurs = Bukkit.getOnlinePlayers().size();
+        plugin.messages().send(sender, "stats-entete", "fenetre", String.valueOf(Math.round(fenetre)),
+                "joueurs", String.valueOf(joueurs));
+        for (Mesures.Tache tache : Mesures.Tache.values()) {
+            Mesures.Bilan bilan = mesures.bilan(tache);
+            double parTick = bilan.totalNanos() / 1000.0 / (fenetre * 20);
+            plugin.messages().send(sender, "stats-ligne", "tache", plugin.messages().text("stats." + tache.cle),
+                    "passages", String.valueOf(bilan.passages()), "moyenne", micros(bilan.moyenneMicros()),
+                    "max", micros(bilan.maxMicros()), "par-tick", micros(parTick),
+                    "par-joueur", joueurs == 0 ? "-" : micros(parTick / joueurs));
+        }
+        plugin.messages().send(sender, "stats-pied", "dessines", String.valueOf(plugin.registry().drawn().size()),
+                "suivis", String.valueOf(plugin.tracker().watchedPlayers()));
+    }
+
+    private static String micros(double value) {
+        return String.format(Locale.ROOT, value < 10 ? "%.2f" : "%.1f", value);
     }
 
     private void delete(CommandSender sender, String[] args) {
