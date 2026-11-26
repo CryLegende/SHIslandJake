@@ -23,6 +23,7 @@ import java.util.logging.Level;
 public final class SHIslandJake extends JavaPlugin {
 
     private static final long SAVE_TICKS = 100L;
+    private static final long CLEAN_TICKS = 6000L;
 
     private volatile Settings settings;
     private volatile Messages messages;
@@ -30,13 +31,17 @@ public final class SHIslandJake extends JavaPlugin {
     private AlertCondition alerts;
     private JakeRegistry registry;
     private JakeStore store;
+    private Textes textes;
     private JakeDisplay display;
     private JakeManager manager;
     private JakeTracker tracker;
+    private Reactions reactions;
+    private Discret discret;
     private MoveSessions moves;
     private JakeCommands commands;
     private IslandSubCommand islandCommand;
     private BukkitTask saveTask;
+    private BukkitTask cleanTask;
     private Thread mainThread;
     private long loadMillis;
     private final Mesures mesures = new Mesures();
@@ -49,9 +54,9 @@ public final class SHIslandJake extends JavaPlugin {
             saveResource("messages.yml", false);
         }
         try {
-            settings = new Settings(readYaml("config.yml"), getLogger());
+            settings = new Settings(FichiersConfig.lire(getDataFolder(), "config.yml"), getLogger());
             messages = new Messages(readMessages());
-        } catch (IOException | InvalidConfigurationException e) {
+        } catch (FichiersConfig.FichierInvalide e) {
             getLogger().log(Level.SEVERE, "Configuration illisible, SHIslandJake s'arrête : " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
@@ -62,8 +67,14 @@ public final class SHIslandJake extends JavaPlugin {
         registry = new JakeRegistry();
         store = new JakeStore(getDataFolder(), getLogger());
         long start = System.nanoTime();
+        int replaced = 0;
         try {
             for (JakeData data : store.load().jakes()) {
+                String type = settings.remplacements.appliquer(data.type());
+                if (!type.equals(data.type())) {
+                    data = data.withType(type);
+                    replaced++;
+                }
                 registry.add(new Jake(data));
             }
             loadMillis = (System.nanoTime() - start) / 1_000_000;
@@ -73,10 +84,18 @@ public final class SHIslandJake extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        display = new JakeDisplay(this, registry);
+        if (replaced > 0) {
+            store.markDirty();
+            getLogger().info("apparences.remplacements : " + replaced + " Jake ont changé d'apparence.");
+        }
+        discret = new Discret(this);
+        textes = new Textes(this);
+        display = new JakeDisplay(this, registry, textes);
         manager = new JakeManager(this, registry, store, display, islands);
-        tracker = new JakeTracker(this, registry, display);
+        tracker = new JakeTracker(this, registry, display, textes);
+        display.setTracker(tracker);
         manager.setTracker(tracker);
+        reactions = new Reactions(this);
         moves = new MoveSessions(this);
         commands = new JakeCommands(this);
 
@@ -104,9 +123,14 @@ public final class SHIslandJake extends JavaPlugin {
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             new JakePlaceholders(this).register();
         }
+        // rechargement à chaud : les joueurs déjà là gardent leur réglage « discret »
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            discret.charger(player);
+        }
 
         tracker.start();
         saveTask = getServer().getScheduler().runTaskTimer(this, () -> store.flush(registry), SAVE_TICKS, SAVE_TICKS);
+        cleanTask = getServer().getScheduler().runTaskTimer(this, () -> reactions.nettoyer(), CLEAN_TICKS, CLEAN_TICKS);
         // Une fois le serveur lancé, SuperiorSkyblock2 connaît toutes les îles
         getServer().getScheduler().runTask(this, () -> {
             int removed = manager.pruneOrphans();
@@ -114,7 +138,8 @@ public final class SHIslandJake extends JavaPlugin {
                 getLogger().info(removed + " Jake d'îles supprimées retirés.");
             }
         });
-        getLogger().info(registry.size() + " Jake chargés (jakes.yml lu en " + loadMillis + " ms).");
+        getLogger().info(registry.size() + " Jake chargés (jakes.yml lu en " + loadMillis + " ms), "
+                + settings.reactions.toutes().size() + " réactions.");
     }
 
     @Override
@@ -128,8 +153,15 @@ public final class SHIslandJake extends JavaPlugin {
         if (saveTask != null) {
             saveTask.cancel();
         }
+        if (cleanTask != null) {
+            cleanTask.cancel();
+        }
+        // tout ce qui a été envoyé en paquets est détruit chez les joueurs (textes, bulles, zones)
         if (tracker != null) {
             tracker.stop();
+        }
+        if (textes != null) {
+            textes.arreter();
         }
         if (moves != null) {
             moves.clear();
@@ -151,47 +183,43 @@ public final class SHIslandJake extends JavaPlugin {
 
     //RECHARGEMENT----------
 
-    /** Relit config.yml et messages.yml ; un fichier invalide laisse l'ancienne configuration en place. */
+    /** Relit config.yml (réactions comprises) et messages.yml ; un fichier invalide laisse l'ancienne configuration. */
     void reload(CommandSender sender) {
         Settings newSettings;
-        try {
-            newSettings = new Settings(readYaml("config.yml"), getLogger());
-        } catch (IOException | InvalidConfigurationException e) {
-            getLogger().warning("config.yml invalide, rechargement annulé : " + e.getMessage());
-            messages.send(sender, "recharge-erreur", "fichier", "config.yml");
-            return;
-        }
         Messages newMessages;
         try {
+            newSettings = new Settings(FichiersConfig.lire(getDataFolder(), "config.yml"), getLogger());
             newMessages = new Messages(readMessages());
-        } catch (IOException | InvalidConfigurationException e) {
-            getLogger().warning("messages.yml invalide, rechargement annulé : " + e.getMessage());
-            messages.send(sender, "recharge-erreur", "fichier", "messages.yml");
+        } catch (FichiersConfig.FichierInvalide e) {
+            getLogger().warning(e.fichier() + " invalide, rechargement annulé : " + e.getCause().getMessage());
+            messages.send(sender, "recharge-erreur", "fichier", e.fichier());
             return;
         }
         if (!newSettings.islandSubCommands.equals(settings.islandSubCommands)) {
             getLogger().info("sous-commandes-ile ne change qu'au prochain démarrage.");
         }
         tracker.stop();
+        textes.arreter();
         display.releaseAll();
         settings = newSettings;
         messages = newMessages;
+        reactions.recharge();
+        int replaced = manager.applyReplacements(newSettings.remplacements);
+        if (replaced > 0) {
+            getLogger().info("apparences.remplacements : " + replaced + " Jake ont changé d'apparence.");
+        }
         tracker.start();
-        messages.send(sender, "recharge");
+        messages.send(sender, "recharge", "reactions", String.valueOf(newSettings.reactions.toutes().size()));
     }
 
-    private YamlConfiguration readYaml(String name) throws IOException, InvalidConfigurationException {
-        YamlConfiguration yaml = new YamlConfiguration();
-        yaml.load(new File(getDataFolder(), name));
-        return yaml;
-    }
-
-    private YamlConfiguration readMessages() throws IOException, InvalidConfigurationException {
-        YamlConfiguration yaml = readYaml("messages.yml");
+    private YamlConfiguration readMessages() throws FichiersConfig.FichierInvalide {
+        YamlConfiguration yaml = FichiersConfig.lire(getDataFolder(), "messages.yml");
         try (InputStream in = getResource("messages.yml")) {
             if (in != null) {
                 yaml.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8)));
             }
+        } catch (IOException e) {
+            throw new FichiersConfig.FichierInvalide("messages.yml", e);
         }
         return yaml;
     }
@@ -227,7 +255,7 @@ public final class SHIslandJake extends JavaPlugin {
                 continue;
             }
             manager.add(new JakeData(row.island(), row.world(), row.x(), row.y(), row.z(), settings.yaw,
-                    settings.pitch, row.type(), row.visible()));
+                    settings.pitch, settings.remplacements.appliquer(row.type()), row.visible()));
             imported++;
         }
         String when = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
@@ -290,8 +318,24 @@ public final class SHIslandJake extends JavaPlugin {
         return manager;
     }
 
+    JakeDisplay display() {
+        return display;
+    }
+
     JakeTracker tracker() {
         return tracker;
+    }
+
+    Textes textes() {
+        return textes;
+    }
+
+    Reactions reactions() {
+        return reactions;
+    }
+
+    Discret discret() {
+        return discret;
     }
 
     MoveSessions moves() {

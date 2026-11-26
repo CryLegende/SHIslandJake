@@ -28,13 +28,16 @@ final class AlertCondition {
     /** Lignes séparées par des retours à la ligne ; vide = pas d'alerte. */
     String text(Player player) {
         Settings s = plugin.settings();
-        if (!s.alertEnabled || s.alertPlaceholder.isEmpty() || !Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+        if (!s.alertEnabled || s.alertPlaceholder.isEmpty()) {
             return "";
         }
         int now = Bukkit.getCurrentTick();
         Cached c = cache.get(player.getUniqueId());
         if (c != null && now < c.untilTick()) {
             return c.text();
+        }
+        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            return "";
         }
         String text = PlaceholderAPI.setPlaceholders(player, s.alertPlaceholder).trim().equalsIgnoreCase(s.alertValue)
                 ? lines(player) : "";

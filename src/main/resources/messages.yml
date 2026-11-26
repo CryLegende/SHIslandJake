@@ -1,10 +1,11 @@
 # ============================================================================
-#  SHIslandJake : messages du chat, hologramme, menus et noms des types
+#  SHIslandJake : messages du chat, textes au-dessus de Jake, répliques, menus
+#  et noms des apparences
 # ============================================================================
 #  Codes couleur & et &#RRGGBB acceptés. Format SkyHand pour le chat : préfixe
 #  de la couleur du type, texte en &7, mots importants dans la couleur du type.
 #    &a succès · &e information · &6 avertissement · &c erreur
-#  Un message vide n'est pas envoyé. {nom} = nom de Jake selon son type.
+#  Un message vide n'est pas envoyé. {nom} = nom de Jake selon son apparence.
 # ============================================================================
 
 chat:
@@ -14,6 +15,9 @@ chat:
   pas-membre: '&7&l« &c&lSH &8&l» &7Vous devez faire partie de &ccette île &7pour parler à {nom}.'
   visible: '&7&l« &a&lSH &8&l» &a{nom} &7est de nouveau &avisible &7par tout le monde.'
   cache: '&7&l« &a&lSH &8&l» &a{nom} &7se &acache &7maintenant de tout le monde.'
+  # Jake discret pour ce joueur seul (ni bulle, ni geste, ni son), ou de nouveau bavard.
+  discret: '&7&l« &a&lSH &8&l» &a{nom} &7reste maintenant &adiscret &7avec vous.'
+  bavard: '&7&l« &a&lSH &8&l» &a{nom} &7vous &aparle &7de nouveau.'
   # {secondes} = temps laissé pour cliquer.
   deplacement-debut: '&7&l« &e&lSH &8&l» &7Cliquez sur un &ebloc de votre île &7pour y placer &e{nom} &7(&e{secondes} s&7).'
   deplacement-deja: '&7&l« &e&lSH &8&l» &7Cliquez sur un &ebloc de votre île &7pour y placer &e{nom}&7.'
@@ -22,23 +26,29 @@ chat:
   deplacement-annule: '&7&l« &6&lSH &8&l» &7Déplacement de &6{nom} &7annulé.'
   deplacement-hors-ile: '&7&l« &c&lSH &8&l» &7Ce bloc n''est pas sur &cvotre île&7.'
   deplacement-place: '&7&l« &c&lSH &8&l» &7Il n''y a pas assez de &cplace &7au-dessus de ce bloc.'
-  # {type} = nom du type.
+  # {type} = nom de l'apparence.
   type-change: '&7&l« &a&lSH &8&l» &7Jake est maintenant &a{type}&7.'
   type-deja: '&7&l« &e&lSH &8&l» &7Jake est déjà &e{type}&7.'
-  type-reserve: '&7&l« &c&lSH &8&l» &7Le type &c{type} &7est réservé aux grades &cVIP&7.'
-  type-inconnu: '&7&l« &c&lSH &8&l» &7Il n''existe pas de type &c{type}&7.'
+  # Apparence obtenue mais réservée à d'autres grades (ou, sans apparences.permission-usage, droit manquant).
+  type-reserve: '&7&l« &c&lSH &8&l» &7L''apparence &c{type} &7est réservée aux grades &cVIP&7.'
+  # Apparence pas encore obtenue (avec apparences.permission-usage).
+  type-non-obtenue: '&7&l« &c&lSH &8&l» &7Vous n''avez pas encore obtenu l''apparence &c{type}&7.'
+  type-inconnu: '&7&l« &c&lSH &8&l» &7Il n''existe pas d''apparence &c{type}&7.'
   sans-permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la &cpermission &7d''utiliser cette commande.'
   joueurs-seulement: '&7&l« &c&lSH &8&l» &7Cette commande se lance &cen jeu&7.'
   # {commandes} = sous-commandes permises, séparées par « | ».
   utilisation: '&7&l« &e&lSH &8&l» &7Tapez &e/jake {commandes}&7.'
   utilisation-admin: '&7&l« &e&lSH &8&l» &7Tapez &e/shislandjake {commandes}&7.'
-  recharge: '&7&l« &a&lSH &8&l» &7Configuration &arechargée&7.'
+  # {reactions} = nombre de réactions lues.
+  recharge: '&7&l« &a&lSH &8&l» &7Configuration &arechargée &7({reactions} réactions).'
   # {fichier} = fichier refusé ; l'ancienne configuration reste en place.
   recharge-erreur: '&7&l« &c&lSH &8&l» &c{fichier} &7est invalide : l''ancienne configuration reste en place (voir la console).'
-  # {jakes} = Jake enregistrés, {caches} = Jake cachés, {dessines} = Jake que FancyNpcs dessine en ce moment.
+  # /shislandjake react avec un nom de réaction absent de config.yml (reactions). {reaction} = nom donné.
+  reaction-inconnue: '&7&l« &c&lSH &8&l» &7Il n''existe pas de réaction &c{reaction} &7(config.yml, reactions).'
+  # {jakes} = Jake enregistrés, {caches} = Jake cachés, {dessines} = Jake dessinés en ce moment.
   info: '&7&l« &e&lSH &8&l» &e{jakes} Jake &7({caches} cachés), &e{dessines} &7dessinés en ce moment.'
-  # {joueur}, {type}, {monde}, {x}, {y}, {z}, {visible}.
-  info-joueur: '&7&l« &e&lSH &8&l» &7Jake de l''île de &e{joueur} &7: &e{type} &7en &e{monde} {x} {y} {z}&7, {visible}&7.'
+  # {joueur}, {type}, {monde}, {x}, {y}, {z}, {visible}, {corps} (texte de « corps »).
+  info-joueur: '&7&l« &e&lSH &8&l» &7Jake de l''île de &e{joueur} &7: &e{type} &7en &e{monde} {x} {y} {z}&7, {visible}&7, {corps}&7.'
   info-sans-jake: '&7&l« &e&lSH &8&l» &7L''île de &e{joueur} &7n''a pas de Jake.'
   joueur-sans-ile: '&7&l« &c&lSH &8&l» &c{joueur} &7n''a pas d''île.'
   aucune-ile-ici: '&7&l« &c&lSH &8&l» &7Vous n''êtes sur &caucune île&7.'
@@ -61,6 +71,9 @@ sous-commandes:
   deplacer: deplacer
   visibilite: visibilite
   type: type
+  discret: discret
+  react: react <joueur> <réaction> [texte]
+  say: say <joueur> <texte>
 
 # Noms des tâches dans /shislandjake stats.
 stats:
@@ -69,18 +82,52 @@ stats:
   reactions: Réactions
   bulles: Bulles
 
-# Texte de %shislandjake_visible%, et de {visible} dans info-joueur.
+# Ce qui dessine un Jake, dans /shislandjake info <joueur>. {apparence} = apparence dessinée.
+corps:
+  aucun: '&7pas dessiné en ce moment'
+  modele: '&7modèle &e{apparence}'
+  mob: '&7corps de secours &e{apparence}'
+
+# Texte de %shislandjake_visible% et de {visible} dans info-joueur, et de %shislandjake_discret%.
 placeholders:
   visible: '&avisible'
   cache: '&ccaché'
+  discret-oui: oui
+  discret-non: non
 
-# Lignes de l'hologramme au-dessus de Jake. {nom} = nom de Jake selon son type.
+# Nom au-dessus de Jake. {nom} = nom de Jake selon son apparence.
 hologramme:
   - '&b&l{nom}'
   - '&7(clic droit)'
 
-# Nom de chaque type dans les menus et les messages, et nom de Jake sous ce type.
-# Un type sans « jake » garde le nom par défaut.
+# Ligne d'alerte au-dessus du nom (config.yml, alerte), montrée seulement au membre concerné. Les placeholders
+# sont lus pour lui ; une ligne vide n'est pas montrée.
+alerte:
+  - '&e&l!'
+
+# Bulle de Jake quand il parle à un joueur. {texte} = la réplique, écrite mot par mot.
+bulle:
+  format: '&f{texte}'
+
+# Répliques des réactions (config.yml, reactions.<réaction>.repliques) : repliques.<caractère>.<liste>, sinon
+# repliques.defaut.<liste>. Le caractère vient de l'apparence (types.<ID>.caractere). Une ligne au hasard, jamais deux
+# fois de suite la même pour un joueur. {joueur} = le joueur, {nom} = nom de Jake, {chef} = chef de l'île ; les
+# placeholders sont lus pour le joueur.
+repliques:
+  defaut:
+    bonjour:
+      - 'Bonjour {joueur} !'
+      - 'Ah, vous revoilà {joueur}.'
+      - 'Content de vous revoir sur l''île.'
+    visiteur:
+      - 'Bienvenue sur l''île de {chef} !'
+      - 'Bonjour ! Vous êtes chez {chef} ici.'
+    joie:
+      - 'Bravo, {joueur} !'
+      - 'Magnifique !'
+
+# Nom de chaque apparence dans les menus et les messages, et nom de Jake sous cette apparence.
+# Une apparence sans « jake » garde le nom par défaut.
 types:
   defaut-jake: Jake
   VILLAGER:
@@ -107,8 +154,8 @@ menu:
         - '&8&l« &fRéglez-moi comme vous voulez ! &8&l»'
     type:
       nom: '&dApparence de {nom}'
-      # {types} = une ligne par type (ligne, ligne-actuel), {reserve} = ligne
-      # « reserve » quand le joueur n'a accès à aucun autre type.
+      # {types} = une ligne par apparence (ligne, ligne-actuel), {reserve} = ligne
+      # « reserve » quand le joueur ne peut utiliser aucune autre apparence.
       description:
         - ''
         - '&8&l« &7Choisissez à quoi ressemble {nom}. &8&l»'
@@ -119,7 +166,7 @@ menu:
         - '&7&o(( &d&oCliquez pour choisir &7&o))'
       ligne: ' &8• &7{type}'
       ligne-actuel: ' &d✔ &f{type}'
-      reserve: ' &8✘ &7Les autres sont réservés aux grades &dVIP&7.'
+      reserve: ' &8✘ &7Les autres sont réservées aux grades &dVIP&7.'
     visibilite:
       nom: '&aVisibilité de {nom}'
       # {etat} = etat-visible ou etat-cache, {action} = action-visible ou action-cache.
@@ -143,11 +190,27 @@ menu:
         - '&7votre île où vous voulez {nom}. &8&l»'
         - ''
         - '&7&o(( &6&oCliquez pour choisir le bloc &7&o))'
+    discret:
+      nom: '&bParole de {nom}'
+      # {etat} = etat-discret ou etat-bavard, {action} = action-discret ou action-bavard. Ce réglage ne vaut que
+      # pour le joueur, sur toutes les îles.
+      description:
+        - ''
+        - '&8&l« &7Je peux vous parler quand vous'
+        - '&7passez, ou rester discret. &8&l»'
+        - ''
+        - ' {etat}'
+        - ''
+        - '&7&o(( &b&oCliquez pour {action} &7&o))'
+      etat-bavard: '&a• &7{nom} vous &aparle'
+      etat-discret: '&8• &7{nom} reste &8discret'
+      action-bavard: 'rendre {nom} discret'
+      action-discret: 'que {nom} vous parle'
     retour:
       nom: '&c⤾ Retour &7(Clic)'
   types:
     titre: '&8&l{nom} &8| Apparence'
-    # {type} = nom du type, {jake} = nom de Jake sous ce type.
+    # {type} = nom de l'apparence, {jake} = nom de Jake sous cette apparence.
     jake:
       nom: '&e{nom}, votre guide'
       description:
@@ -163,17 +226,17 @@ menu:
         - '&8&l« &7{jake} prend cette apparence. &8&l»'
         - ''
         - '&7&o(( &d&oCliquez pour choisir &7&o))'
+      # Pas encore obtenue (avec apparences.permission-usage).
+      non-obtenue:
+        - ''
+        - ' &c✘ &7Pas encore obtenue'
+      # Obtenue, mais réservée à d'autres grades (sans permission-usage : droit de l'apparence manquant).
       reserve:
         - ''
-        - ' &c✘ &7Réservé aux grades &dVIP'
+        - ' &c✘ &7Réservée aux grades &dVIP'
     retour:
       nom: '&c⤾ Retour &7(Clic)'
 
 # Aide de /is pour la sous-commande « jake ».
 sous-commande-ile:
   description: Ouvrir Jake, le PNJ de votre île.
-
-# Ligne d'alerte au-dessus de l'hologramme (config.yml, alerte), montrée seulement au membre concerné. Les placeholders
-# sont lus pour lui ; une ligne vide n'est pas montrée.
-alerte:
-  - '&e&l!'

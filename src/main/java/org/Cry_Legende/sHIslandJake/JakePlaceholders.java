@@ -8,8 +8,8 @@ import java.util.Locale;
 
 /**
  * %shislandjake_type%, %shislandjake_type_nom%, %shislandjake_nom%, %shislandjake_visible% : le Jake de l'île
- * du joueur. Peut être appelé hors du fil principal : seules des données immuables sont lues.
- * Seule classe qui touche à PlaceholderAPI.
+ * du joueur ; %shislandjake_discret% : le réglage « Jake discret » du joueur. Peut être appelé hors du fil
+ * principal : seules des données immuables (ou concurrentes) sont lues.
  */
 final class JakePlaceholders extends PlaceholderExpansion {
 
@@ -44,6 +44,10 @@ final class JakePlaceholders extends PlaceholderExpansion {
         if (player == null) {
             return "";
         }
+        if (params.equalsIgnoreCase("discret")) {
+            return plugin.messages().text(plugin.discret().est(player.getUniqueId())
+                    ? "placeholders.discret-oui" : "placeholders.discret-non");
+        }
         Island island = plugin.islands().of(player.getUniqueId());
         Jake jake = island == null ? null : plugin.registry().get(island.getUniqueId());
         if (jake == null) {
@@ -51,7 +55,7 @@ final class JakePlaceholders extends PlaceholderExpansion {
         }
         JakeData d = jake.data();
         return switch (params.toLowerCase(Locale.ROOT)) {
-            case "type" -> d.type().name();
+            case "type" -> d.type();
             case "type_nom" -> plugin.messages().typeName(d.type());
             case "nom" -> plugin.messages().jakeName(d.type());
             case "visible" -> plugin.messages().text(d.visible() ? "placeholders.visible" : "placeholders.cache");

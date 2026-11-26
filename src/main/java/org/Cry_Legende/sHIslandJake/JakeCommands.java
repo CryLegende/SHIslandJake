@@ -7,10 +7,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -24,9 +24,10 @@ final class JakeCommands {
 
     private static final Set<String> MOVE = Set.of("deplacer", "déplacer", "location", "move", "change");
     private static final Set<String> VISIBILITY = Set.of("visibilite", "visibilité", "visibility");
-    private static final Set<String> TYPE = Set.of("type", "mob");
+    private static final Set<String> TYPE = Set.of("type", "mob", "apparence");
     private static final Set<String> MENU = Set.of("menu", "reglages", "réglages", "settings");
-    private static final List<String> ADMIN = List.of("reload", "info", "delete", "import", "stats");
+    private static final Set<String> DISCREET = Set.of("discret", "discreet");
+    private static final List<String> ADMIN = List.of("reload", "info", "delete", "import", "stats", "react", "say");
     /** Anciennes sous-commandes d'administration de /islandnpc. */
     private static final Set<String> OLD_ADMIN = Set.of("reload", "about", "delete", "import", "info");
 
@@ -92,6 +93,10 @@ final class JakeCommands {
             if (allowed(player, "shislandjake.visibilite")) {
                 withJake(player, jake -> toggleVisibility(player, jake));
             }
+        } else if (DISCREET.contains(sub)) {
+            if (allowed(player, "shislandjake.use")) {
+                toggleDiscreet(player);
+            }
         } else if (TYPE.contains(sub)) {
             if (!allowed(player, "shislandjake.use")) {
                 return;
@@ -100,7 +105,7 @@ final class JakeCommands {
                 withJake(player, jake -> menu(player, JakeMenu.Kind.TYPES, jake));
                 return;
             }
-            EntityType type = typeByName(args[1]);
+            Settings.Apparence type = typeByName(args[1]);
             if (type == null) {
                 plugin.messages().send(player, "type-inconnu", "type", args[1]);
                 return;
@@ -149,24 +154,41 @@ final class JakeCommands {
         plugin.messages().send(player, visible ? "visible" : "cache", "nom", plugin.messages().jakeName(jake.data().type()));
     }
 
-    /** Vrai si le type a changé. */
-    boolean changeType(Player player, Jake jake, EntityType type) {
-        Settings.TypeSettings settings = plugin.settings().types.get(type);
-        String typeName = plugin.messages().typeName(type);
-        if (settings == null) {
-            plugin.messages().send(player, "type-inconnu", "type", type.name());
-            return false;
-        }
-        if (jake.data().type() == type) {
+    /** Jake discret pour ce joueur (réglage à lui seul, sur toutes les îles). */
+    void toggleDiscreet(Player player) {
+        boolean discret = plugin.discret().basculer(player);
+        plugin.sound(player, plugin.settings().soundSuccess);
+        plugin.messages().send(player, discret ? "discret" : "bavard", "nom", jakeNameOf(player));
+    }
+
+    private String jakeNameOf(Player player) {
+        Island island = plugin.islands().of(player);
+        Jake jake = island == null ? null : plugin.registry().get(island.getUniqueId());
+        return plugin.messages().jakeName(jake == null ? plugin.settings().defaultType : jake.data().type());
+    }
+
+    /** Vrai si l'apparence a changé. Les droits sont vérifiés ici, au moment du choix. */
+    boolean changeType(Player player, Jake jake, Settings.Apparence type) {
+        String typeName = plugin.messages().typeName(type.id());
+        if (jake.data().type().equals(type.id())) {
             plugin.messages().send(player, "type-deja", "type", typeName);
             return false;
         }
-        if (!settings.allowed(player)) {
-            plugin.sound(player, plugin.settings().soundRefusal);
-            plugin.messages().send(player, "type-reserve", "type", typeName);
-            return false;
+        switch (plugin.settings().etat(player, type)) {
+            case NON_OBTENUE -> {
+                plugin.sound(player, plugin.settings().soundRefusal);
+                plugin.messages().send(player, "type-non-obtenue", "type", typeName);
+                return false;
+            }
+            case RESERVE -> {
+                plugin.sound(player, plugin.settings().soundRefusal);
+                plugin.messages().send(player, "type-reserve", "type", typeName);
+                return false;
+            }
+            default -> {
+            }
         }
-        plugin.manager().setType(jake, type);
+        plugin.manager().setType(jake, type.id());
         plugin.sound(player, plugin.settings().soundSuccess);
         plugin.messages().send(player, "type-change", "type", typeName);
         return true;
@@ -199,10 +221,10 @@ final class JakeCommands {
         return false;
     }
 
-    private EntityType typeByName(String name) {
-        String wanted = name.toLowerCase(Locale.ROOT);
-        for (EntityType type : plugin.settings().types.keySet()) {
-            if (type.name().equalsIgnoreCase(wanted) || plugin.messages().typeName(type).equalsIgnoreCase(name)) {
+    private Settings.Apparence typeByName(String name) {
+        String wanted = Remplacements.id(name);
+        for (Settings.Apparence type : plugin.settings().types.values()) {
+            if (type.id().equals(wanted) || plugin.messages().typeName(type.id()).equalsIgnoreCase(name)) {
                 return type;
             }
         }
@@ -222,6 +244,7 @@ final class JakeCommands {
         }
         if (sender.hasPermission("shislandjake.use")) {
             parts.add(plugin.messages().text("sous-commandes.type"));
+            parts.add(plugin.messages().text("sous-commandes.discret"));
         }
         return "[" + String.join("|", parts) + "]";
     }
@@ -243,12 +266,13 @@ final class JakeCommands {
             }
             if (sender.hasPermission("shislandjake.use")) {
                 options.add("type");
+                options.add("discret");
             }
         } else if (args.length == 2 && TYPE.contains(args[0].toLowerCase(Locale.ROOT))
                 && sender.hasPermission("shislandjake.use")) {
-            for (Settings.TypeSettings type : plugin.settings().types.values()) {
-                if (type.allowed(sender)) {
-                    options.add(type.type().name().toLowerCase(Locale.ROOT));
+            for (Settings.Apparence type : plugin.settings().types.values()) {
+                if (plugin.settings().etat(sender, type) == Settings.Etat.DISPONIBLE) {
+                    options.add(type.id().toLowerCase(Locale.ROOT));
                 }
             }
         }
@@ -281,8 +305,43 @@ final class JakeCommands {
             case "delete" -> delete(sender, args);
             case "import" -> plugin.importIslandNpc(sender);
             case "stats" -> stats(sender);
+            case "react" -> react(sender, args);
+            case "say" -> say(sender, args);
             default -> {
             }
+        }
+    }
+
+    /**
+     * /shislandjake react <joueur> <réaction> [texte…] : lancée par d'autres plugins à chaque usage, elle ne dit rien,
+     * qu'elle joue ou soit abandonnée (joueur absent ou loin de Jake). Seule une réaction inconnue est signalée.
+     */
+    private void react(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            plugin.messages().send(sender, "utilisation-admin", "commandes", plugin.messages().text("sous-commandes.react"));
+            return;
+        }
+        if (plugin.settings().reactions.get(args[2]) == null) {
+            plugin.messages().send(sender, "reaction-inconnue", "reaction", args[2]);
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            return;
+        }
+        String texte = args.length > 3 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : null;
+        plugin.reactions().commande(target, args[2], texte);
+    }
+
+    /** /shislandjake say <joueur> <texte…> : une bulle seule, sans un mot en retour. */
+    private void say(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            plugin.messages().send(sender, "utilisation-admin", "commandes", plugin.messages().text("sous-commandes.say"));
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target != null) {
+            plugin.reactions().dire(target, String.join(" ", Arrays.copyOfRange(args, 2, args.length)));
         }
     }
 
@@ -308,9 +367,20 @@ final class JakeCommands {
             return;
         }
         JakeData d = jake.data();
-        plugin.messages().send(sender, "info-joueur", "joueur", args[1], "type", d.type().name(), "monde", d.world(),
+        plugin.messages().send(sender, "info-joueur", "joueur", args[1], "type", d.type(), "monde", d.world(),
                 "x", format(d.x()), "y", format(d.y()), "z", format(d.z()),
-                "visible", plugin.messages().text(d.visible() ? "placeholders.visible" : "placeholders.cache"));
+                "visible", plugin.messages().text(d.visible() ? "placeholders.visible" : "placeholders.cache"),
+                "corps", corps(jake));
+    }
+
+    /** Ce qui dessine ce Jake en ce moment (messages.yml, corps). */
+    private String corps(Jake jake) {
+        if (jake.corps() == null) {
+            return plugin.messages().text("corps.aucun");
+        }
+        Settings.Apparence a = jake.dessinee();
+        return plugin.messages().text(a != null && a.estModele() ? "corps.modele" : "corps.mob",
+                "apparence", a == null ? "?" : a.id());
     }
 
     /** Coût des tâches de Jake sur la dernière minute. */
@@ -387,17 +457,20 @@ final class JakeCommands {
 
     private List<String> adminTab(CommandSender sender, String[] args) {
         List<String> options = new ArrayList<>();
+        String sub = args.length > 1 ? args[0].toLowerCase(Locale.ROOT) : "";
+        boolean allowed = !sub.isEmpty() && sender.hasPermission("shislandjake.admin." + sub);
         if (args.length == 1) {
-            for (String sub : ADMIN) {
-                if (sender.hasPermission("shislandjake.admin." + sub)) {
-                    options.add(sub);
+            for (String s : ADMIN) {
+                if (sender.hasPermission("shislandjake.admin." + s)) {
+                    options.add(s);
                 }
             }
-        } else if (args.length == 2 && (args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("delete"))
-                && sender.hasPermission("shislandjake.admin." + args[0].toLowerCase(Locale.ROOT))) {
+        } else if (args.length == 2 && allowed && Set.of("info", "delete", "react", "say").contains(sub)) {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 options.add(player.getName());
             }
+        } else if (args.length == 3 && allowed && sub.equals("react")) {
+            options.addAll(plugin.settings().reactions.toutes().keySet());
         }
         return filter(options, args[args.length - 1]);
     }

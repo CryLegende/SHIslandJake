@@ -1,205 +1,169 @@
 package org.Cry_Legende.sHIslandJake;
 
-import de.oliver.fancynpcs.api.FancyNpcsPlugin;
-import de.oliver.fancynpcs.api.Npc;
-import de.oliver.fancynpcs.api.NpcData;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 
 /**
- * Dessin des Jake : un PNJ FancyNpcs créé par l'adaptateur sans passer par son NpcManager (ni sauvegarde ni
- * boucle de visibilité de FancyNpcs) et, s'il est installé, un hologramme FancyHolograms. Fil principal.
+ * Choisit le corps de chaque Jake : le modèle de son apparence (BlockDisplayCreator) quand il existe, sinon le corps de
+ * secours (FancyNpcs, apparence « apparences.secours ») ; jamais d'île sans Jake. Un avertissement par apparence
+ * dont le modèle manque, une fois. Fil principal.
  */
 final class JakeDisplay {
 
     private final SHIslandJake plugin;
     private final JakeRegistry registry;
-    private final Holograms holograms;
+    private final CorpsMob mob;
+    private final CorpsModele modele;
+    private final Textes textes;
+    /** Apparences déjà signalées en console (modèle introuvable). */
+    private final Set<String> signalees = new HashSet<>();
+    /** Dernier tick où chaque Jake a été vérifié : plusieurs joueurs autour d'un Jake ne le vérifient qu'une fois. */
+    private final java.util.Map<Jake, Integer> verifies = new java.util.HashMap<>();
+    private JakeTracker tracker;
 
-    JakeDisplay(SHIslandJake plugin, JakeRegistry registry) {
+    JakeDisplay(SHIslandJake plugin, JakeRegistry registry, Textes textes) {
         this.plugin = plugin;
         this.registry = registry;
-        // La classe Holograms ne se charge pas sans FancyHolograms : sa présence est vérifiée avant
-        this.holograms = Bukkit.getPluginManager().isPluginEnabled("FancyHolograms") ? new Holograms(plugin.getLogger()) : null;
-        if (holograms == null) {
-            plugin.getLogger().info("FancyHolograms absent : la première ligne de l'hologramme devient le nom de Jake.");
-        }
+        this.textes = textes;
+        this.mob = new CorpsMob(plugin, registry);
+        this.modele = new CorpsModele(plugin);
     }
 
-    private boolean useHolograms() {
-        return holograms != null && plugin.settings().hologram;
+    void setTracker(JakeTracker tracker) {
+        this.tracker = tracker;
     }
 
-    /** Le PNJ du Jake, créé au premier passage d'un joueur. Null si son monde n'est pas chargé. */
-    Npc handle(Jake jake) {
-        if (jake.handle() != null) {
-            return jake.handle();
-        }
-        Location location = jake.location();
-        if (location == null) {
-            return null;
-        }
-        Settings settings = plugin.settings();
-        JakeData d = jake.data();
-        NpcData data = new NpcData("shislandjake-" + d.island(), d.island(), location);
-        data.setType(d.type());
-        data.setVisibilityDistance(settings.viewDistance);
-        data.setCollidable(false);
-        data.setShowInTab(false);
-        data.setGlowing(settings.glowing);
-        data.setGlowingColor(settings.glowColor);
-        data.setDisplayName(nameTag(d));
-
-        Npc handle = FancyNpcsPlugin.get().getNpcAdapter().apply(data);
-        handle.setSaveToFile(false);
-        handle.create();
-        jake.setHandle(handle);
-        registry.link(handle.getEntityId(), jake);
-        return handle;
-    }
-
-    /** Sans hologramme, la première ligne sert de nom au-dessus du PNJ. */
-    private String nameTag(JakeData d) {
-        if (useHolograms() || !plugin.settings().hologram) {
-            return "<empty>";
-        }
-        List<String> lines = hologramLines(d);
-        return lines.isEmpty() ? "<empty>" : lines.getFirst();
-    }
-
-    private List<String> hologramLines(JakeData d) {
-        List<String> lines = new ArrayList<>();
-        for (String line : plugin.messages().lines("hologramme", "nom", plugin.messages().jakeName(d.type()))) {
-            lines.add(Messages.miniMessage(line));
-        }
-        return lines;
-    }
-
-    /** Montre ou cache l'hologramme du Jake à ce joueur. */
-    void syncHologram(Jake jake, Player player, boolean shown) {
-        if (!useHolograms()) {
-            return;
-        }
-        Object hologram = jake.hologram();
-        if (hologram == null) {
-            if (!shown) {
-                return;
-            }
-            Location base = jake.location();
-            if (base == null) {
-                return;
-            }
-            JakeData d = jake.data();
-            base.add(0, plugin.settings().height(d.type()), 0);
-            base.setYaw(0);
-            base.setPitch(0);
-            hologram = holograms.create("shislandjake_" + d.island(), base, hologramLines(d), plugin.settings());
-            if (hologram == null) {
-                return;
-            }
-            jake.setHologram(hologram);
-        }
-        if (shown) {
-            holograms.show(hologram, player);
-        } else {
-            holograms.hide(hologram, player);
-        }
-    }
-
-    /** Montre à ce joueur sa ligne d'alerte au-dessus de l'hologramme, la change ou l'enlève (texte vide). */
-    void syncAlert(Jake jake, Player player, String text) {
-        if (!useHolograms()) {
-            return;
-        }
-        UUID id = player.getUniqueId();
-        Jake.Alert current = jake.alerts().get(id);
-        if (current != null && current.text().equals(text)) {
-            holograms.show(current.hologram(), player);
-            return;
-        }
-        if (current != null) {
-            jake.alerts().remove(id);
-            holograms.hideAll(current.hologram());
-        }
-        Location base = text.isEmpty() ? null : jake.location();
-        if (base == null) {
-            return;
-        }
-        JakeData d = jake.data();
-        base.add(0, plugin.settings().height(d.type()) + plugin.settings().alertOffset, 0);
-        base.setYaw(0);
-        base.setPitch(0);
-        List<String> lines = new ArrayList<>();
-        for (String line : text.split("\n")) {
-            lines.add(Messages.miniMessage(line));
-        }
-        Object hologram = holograms.create("shislandjake_alerte_" + d.island() + "_" + id, base, lines, plugin.settings());
-        if (hologram != null) {
-            jake.alerts().put(id, new Jake.Alert(hologram, text));
-            holograms.show(hologram, player);
-        }
+    CorpsModele modeles() {
+        return modele;
     }
 
     /**
-     * Retire le PNJ et l'hologramme à tous ceux qui les voient et les oublie : ils seront recréés avec les
-     * nouvelles données au prochain passage d'un joueur.
+     * Le Jake est dessiné (créé s'il ne l'était pas, redessiné si son modèle a été lâché) ; faux si son monde ou son
+     * chunk n'est pas chargé.
      */
-    void release(Jake jake) {
-        Npc handle = jake.handle();
-        if (handle != null) {
-            registry.unlink(handle.getEntityId());
-            jake.setHandle(null);
-            forViewers(handle, Npc::remove);
+    boolean montrer(Jake jake) {
+        int tick = Bukkit.getCurrentTick();
+        Integer vu = verifies.get(jake);
+        if (vu != null && vu == tick) {
+            return jake.corps() != null;
         }
-        Object hologram = jake.hologram();
-        if (hologram != null) {
-            jake.setHologram(null);
-            holograms.hideAll(hologram);
+        Corps corps = jake.corps();
+        if (corps != null) {
+            if (corps.vivant(jake)) {
+                verifies.put(jake, tick);
+                return true;
+            }
+            // lâché par le moteur (chunk déchargé, modèle rechargé...) : tout est refait
+            release(jake);
         }
-        for (Jake.Alert alert : jake.alerts().values()) {
-            holograms.hideAll(alert.hologram());
+        Location location = jake.location();
+        if (location == null || !location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+            return false;
         }
-        jake.alerts().clear();
+        numeroter(jake);
+        Settings s = plugin.settings();
+        Settings.Apparence a = s.apparence(jake.data().type());
+        if (a.estModele()) {
+            if (modele.montrer(jake)) {
+                double[] b = modele.bornes(a.modele());
+                double hauteur = !Double.isNaN(a.hauteur()) ? a.hauteur()
+                        : b != null ? b[4] * a.taille() + 0.25 : s.defaultHeight;
+                double largeur = !Double.isNaN(a.zoneLargeur()) ? a.zoneLargeur()
+                        : b != null ? 2 * Math.max(Math.max(Math.abs(b[0]), Math.abs(b[3])), Math.max(Math.abs(b[2]), Math.abs(b[5]))) * a.taille()
+                        : s.defaultZoneWidth;
+                double zoneHauteur = !Double.isNaN(a.zoneHauteur()) ? a.zoneHauteur()
+                        : b != null ? b[4] * a.taille() : s.defaultZoneHeight;
+                jake.dessine(modele, a, hauteur, (float) Math.max(0.1, largeur), (float) Math.max(0.1, zoneHauteur));
+                registry.markDrawn(jake, true);
+                verifies.put(jake, tick);
+                return true;
+            }
+            signaler(a);
+            a = s.secours;
+        }
+        if (mob.montrer(jake, a)) {
+            jake.dessine(mob, a, Double.isNaN(a.hauteur()) ? s.defaultHeight : a.hauteur(), 0f, 0f);
+            registry.markDrawn(jake, true);
+            verifies.put(jake, tick);
+            return true;
+        }
+        return false;
     }
 
-    /** Arrêt ou rechargement : plus rien n'est dessiné. Un hologramme n'existe qu'avec son PNJ. */
+    /** Numéros des textes et de la zone, tirés au premier dessin ; la zone mène au Jake quand on clique dessus. */
+    private void numeroter(Jake jake) {
+        if (!jake.numerote()) {
+            jake.numeros(Paquets.nouveauNumero(), Paquets.nouveauNumero(), Paquets.nouveauNumero());
+            registry.link(jake.zoneId(), jake);
+        }
+    }
+
+    private void signaler(Settings.Apparence a) {
+        if (!signalees.add(a.id())) {
+            return;
+        }
+        String raison = !modele.disponible() ? "BlockDisplayCreator absent ou sans modèles pour les autres plugins"
+                : !modele.connait(a.modele()) ? "modèle « " + a.modele() + " » inconnu de BlockDisplayCreator"
+                : "le modèle « " + a.modele() + " » ne dessine rien";
+        plugin.getLogger().warning("Apparence " + a.id() + " : " + raison + ". Jake est dessiné en "
+                + plugin.settings().secours.id() + " à la place.");
+    }
+
+    /** Ce joueur le voit ou plus (corps de secours ; le moteur des modèles gère seul ses spectateurs). */
+    void voir(Jake jake, Player player, boolean visible) {
+        Corps corps = jake.corps();
+        if (corps != null) {
+            corps.voir(jake, player, visible);
+        }
+    }
+
+    /** Animation du corps pour ce joueur seul ; faux si le corps ne l'a pas. */
+    boolean jouer(Jake jake, String animation, Player player) {
+        Corps corps = jake.corps();
+        return corps != null && animation != null && !animation.isEmpty() && corps.jouer(jake, animation, player);
+    }
+
+    /**
+     * Retire le corps, les textes et la zone à tous ceux qui les voient : ils seront refaits avec les nouvelles
+     * données au prochain passage d'un joueur.
+     */
+    void release(Jake jake) {
+        if (tracker != null) {
+            tracker.forgetJake(jake);
+        }
+        textes.oublierJake(jake);
+        Corps corps = jake.corps();
+        if (corps != null) {
+            corps.retirer(jake);
+        }
+        // un corps de secours ou un modèle resté d'un ancien dessin part aussi
+        mob.retirer(jake);
+        modele.retirer(jake);
+        jake.efface();
+        registry.markDrawn(jake, false);
+        verifies.remove(jake);
+    }
+
+    /** Arrêt ou rechargement : plus rien n'est dessiné. */
     void releaseAll() {
         for (Jake jake : new ArrayList<>(registry.drawn())) {
             release(jake);
         }
+        signalees.clear();
+        verifies.clear();
     }
 
-    /** Joueur parti : les PNJ et hologrammes l'oublient. */
+    /** Joueur parti : les PNJ l'oublient. */
     void forget(Player player) {
         UUID id = player.getUniqueId();
         for (Jake jake : registry.drawn()) {
             jake.forget(id);
-            if (jake.hologram() != null) {
-                holograms.forget(jake.hologram(), player);
-            }
-            Jake.Alert alert = jake.alerts().remove(id);
-            if (alert != null) {
-                holograms.forget(alert.hologram(), player);
-            }
         }
-    }
-
-    /** Sur le fil de FancyNpcs, pour chaque joueur qui voit le PNJ (l'ordre des tâches de ce fil est gardé). */
-    private void forViewers(Npc handle, BiConsumer<Npc, Player> action) {
-        FancyNpcsPlugin.get().getNpcThread().submit(() -> {
-            for (Map.Entry<UUID, Boolean> viewer : handle.getIsVisibleForPlayer().entrySet()) {
-                Player player = viewer.getValue() ? Bukkit.getPlayer(viewer.getKey()) : null;
-                if (player != null) {
-                    action.accept(handle, player);
-                }
-            }
-        });
     }
 }

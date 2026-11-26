@@ -1,6 +1,5 @@
 package org.Cry_Legende.sHIslandJake;
 
-import org.bukkit.entity.EntityType;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,7 +23,7 @@ import java.util.logging.Logger;
  */
 final class IslandNpcImport {
 
-    record Row(UUID island, EntityType type, boolean visible, String world, double x, double y, double z) {
+    record Row(UUID island, String type, boolean visible, String world, double x, double y, double z) {
     }
 
     private final File source;
@@ -41,8 +40,8 @@ final class IslandNpcImport {
         return source.isFile();
     }
 
-    /** Lignes lisibles de npc_data ; un type inconnu prend « defaultType ». */
-    List<Row> read(EntityType defaultType) throws IOException, SQLException {
+    /** Lignes lisibles de npc_data ; un type absent prend « defaultType ». */
+    List<Row> read(String defaultType) throws IOException, SQLException {
         Files.createDirectories(copy.getParentFile().toPath());
         Files.copy(source.toPath(), copy.toPath(), StandardCopyOption.REPLACE_EXISTING);
         List<Row> rows = new ArrayList<>();
@@ -66,8 +65,8 @@ final class IslandNpcImport {
                 ByteBuffer buffer = ByteBuffer.wrap(id);
                 UUID island = new UUID(buffer.getLong(), buffer.getLong());
                 String typeName = result.getString(2);
-                EntityType type = typeName == null ? null : Settings.entityType(typeName, null, null);
-                rows.add(new Row(island, type == null ? defaultType : type, result.getBoolean(3), world,
+                String type = typeName == null || typeName.isBlank() ? defaultType : Remplacements.id(typeName);
+                rows.add(new Row(island, type, result.getBoolean(3), world,
                         result.getDouble(5), result.getDouble(6), result.getDouble(7)));
             }
         } finally {

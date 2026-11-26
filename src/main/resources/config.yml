@@ -4,14 +4,22 @@
 #
 #  Chaque île SuperiorSkyblock2 a son Jake, posé près du centre à la création
 #  de l'île. Un clic sur Jake (membre de l'île) lance la commande « clic ».
-#  Accroupi + clic : les réglages de Jake. Quand un joueur
-#  s'approche, Jake se tourne vers lui (« regarder-joueurs ») ; chaque joueur
-#  ne le voit tourné que vers lui-même.
+#  Accroupi + clic : les réglages de Jake.
 #
-#  Le plugin garde lui-même ses Jake (jakes.yml), FancyNpcs ne fait que les
-#  dessiner : ils n'apparaissent ni dans /npc list ni dans son npcs.yml, et ne
-#  sont créés que là où un joueur passe. L'hologramme au-dessus de Jake vient
-#  de FancyHolograms ; sans lui, la première ligne devient le nom du PNJ.
+#  Jake parle et réagit à ce que fait le joueur : à son arrivée près de Jake,
+#  ou quand un autre plugin le demande (/shislandjake react). Une réaction est
+#  vue par le seul joueur concerné : un geste du modèle, une réplique dans une
+#  bulle au-dessus de Jake, un son, des particules (voir « reactions »).
+#
+#  Le corps de Jake vient de son apparence (« types ») : un modèle de
+#  BlockDisplayCreator (« modele ») ou, en secours, un mob dessiné par
+#  FancyNpcs (« mob »). Si le modèle manque (BlockDisplayCreator absent,
+#  fichier introuvable), Jake est dessiné avec l'apparence
+#  « apparences.secours » : il n'y a jamais d'île sans Jake.
+#
+#  Le plugin garde lui-même ses Jake (jakes.yml) ; ils ne sont dessinés que là
+#  où un joueur passe. Le nom au-dessus de Jake, l'alerte et les bulles sont
+#  envoyés en paquets (packetevents) : chaque joueur reçoit les siens.
 #
 #  Au premier démarrage, les PNJ d'IslandNPC (plugins/IslandNPC/database.db)
 #  sont repris : position, type et visibilité de chaque île.
@@ -21,11 +29,14 @@
 #    /jake reglages [origine]   ouvre les réglages de Jake
 #    /jake deplacer             clic sur un bloc de son île pour y placer Jake
 #    /jake visibilite           cache ou montre Jake à tout le monde
-#    /jake type [type]          choisit l'apparence de Jake (menu sans argument)
+#    /jake type [apparence]     choisit l'apparence de Jake (menu sans argument)
+#    /jake discret              Jake discret pour soi : ni bulle, ni geste, ni son
 #    /jake <autre chose>        lance jake-argument-inconnu.commande
 #
 #  Commandes d'administration (console aussi)
-#    /shislandjake reload           recharge config.yml et messages.yml
+#    /shislandjake reload           recharge config.yml (réactions comprises)
+#                                   et messages.yml ; un fichier invalide est
+#                                   refusé et nommé
 #    /shislandjake info [joueur]    nombre de Jake, ou le Jake de l'île du joueur
 #    /shislandjake delete [joueur]  retire le Jake de l'île où l'on se trouve (ou
 #                                   de l'île du joueur) ; il revient à sa place de
@@ -33,26 +44,35 @@
 #    /shislandjake import           reprend les PNJ d'IslandNPC des îles qui
 #                                   n'ont pas encore de Jake
 #    /shislandjake stats            durée des tâches de Jake sur la dernière minute
+#    /shislandjake react <joueur> <réaction> [texte]
+#                                   joue une réaction pour ce joueur (le texte
+#                                   remplace la réplique) ; ne répond rien, qu'elle
+#                                   joue ou soit abandonnée (joueur loin de Jake...)
+#    /shislandjake say <joueur> <texte>
+#                                   Jake dit ce texte dans une bulle, à ce joueur
+#                                   (codes couleur et placeholders acceptés)
 #
 #  Permissions
-#    shislandjake.use             /jake, réglages, choix de l'apparence (tout le monde)
+#    shislandjake.use             /jake, réglages, apparence, discret (tout le monde)
 #    shislandjake.deplacer        déplacer Jake (tout le monde)
 #    shislandjake.visibilite      cacher ou montrer Jake (tout le monde)
-#    shislandjake.type.<type>     types de Jake (voir « types », VIP ; op par défaut)
-#    shislandjake.type.*          tous les types de la configuration par défaut (op par défaut)
+#    shislandjake.type.<type>     apparences de Jake (voir « types ») ; op par défaut
+#    shislandjake.type.*          toutes les apparences de la configuration par défaut (op)
+#    shislandjake.personnages     droit d'usage proposé pour apparences.permission-usage (op)
 #    shislandjake.bypass          cliquer sur le Jake de n'importe quelle île (op)
-#    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass et type.* (op)
-#    shislandjake.admin.<sous-commande>   reload, info, delete, import, stats
+#    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass, type.*, personnages (op)
+#    shislandjake.admin.<sous-commande>   reload, info, delete, import, stats, react, say
 #
-#  Placeholders (île du joueur)
-#    %shislandjake_type%          type de Jake (VILLAGER, WITCH...)
-#    %shislandjake_type_nom%      nom du type (messages.yml, types)
-#    %shislandjake_nom%           nom de Jake selon son type (Jake, Jakie)
+#  Placeholders
+#    %shislandjake_type%          apparence du Jake de l'île du joueur (VILLAGER...)
+#    %shislandjake_type_nom%      nom de l'apparence (messages.yml, types)
+#    %shislandjake_nom%           nom de Jake selon son apparence (Jake, Jakie)
 #    %shislandjake_visible%       visible ou caché (messages.yml, placeholders)
+#    %shislandjake_discret%       oui si le joueur a rendu Jake discret (messages.yml, placeholders)
 # ============================================================================
 
 jake:
-  # Type de Jake à la création d'une île ; doit figurer dans « types ».
+  # Apparence de Jake à la création d'une île ; doit figurer dans « types ».
   type: VILLAGER
   # Jake visible à la création d'une île.
   visible: true
@@ -72,11 +92,12 @@ affichage:
   distance: 32
   # Ticks entre deux vérifications des Jake proches de chaque joueur.
   intervalle-ticks: 10
-  # Un Jake qu'aucun joueur n'a vu depuis ce nombre de minutes est oublié par
-  # FancyNpcs ; il est recréé au retour d'un joueur.
+  # Un Jake qu'aucun joueur n'a vu depuis ce nombre de minutes n'est plus
+  # dessiné ; il revient avec le prochain joueur.
   oubli-minutes: 10
-  # Jake se tourne vers le joueur qui s'approche (tête, corps, inclinaison) et
-  # reprend son orientation d'origine quand le joueur s'éloigne.
+  # Corps de secours (mob) : Jake se tourne vers le joueur qui s'approche
+  # (tête, corps, inclinaison) et reprend son orientation d'origine quand le
+  # joueur s'éloigne. Un modèle regarde selon son propre fichier.
   regarder-joueurs: true
   # Distance, en blocs, à laquelle Jake regarde un joueur.
   distance-regard: 6
@@ -91,23 +112,42 @@ affichage:
   # Inclinaison maximale de la tête de Jake, vers le haut comme vers le bas,
   # en degrés.
   inclinaison-regard-max: 40
-  # Contour lumineux autour de Jake, et sa couleur : BLACK, DARK_BLUE,
-  # DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY, DARK_GRAY, BLUE,
-  # GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE.
+  # Contour lumineux autour du corps de secours, et sa couleur : BLACK,
+  # DARK_BLUE, DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY,
+  # DARK_GRAY, BLUE, GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE.
   brillance: false
   couleur-brillance: BLUE
 
 hologramme:
-  # Hologramme au-dessus de Jake (lignes dans messages.yml, hologramme).
+  # Nom au-dessus de Jake (lignes dans messages.yml, hologramme).
   active: true
-  # Orientation : CENTER (suit le regard), VERTICAL (tourne sur lui-même) ou FIXED.
+  # Orientation du nom, de l'alerte et des bulles : VERTICAL (debout, tourne
+  # vers le joueur), CENTER (suit aussi l'inclinaison du regard) ou FIXED.
   orientation: VERTICAL
-  # Fond du texte : default (fond gris de Minecraft), transparent, ou #AARRGGBB.
+  # Fond du nom et de l'alerte : transparent, default (fond gris de
+  # Minecraft) ou #AARRGGBB.
   fond: transparent
   ombre-texte: true
-  # Hauteur, en blocs, du bas de l'hologramme au-dessus des pieds de Jake,
-  # pour un type absent de « types ».
+  # Largeur maximale d'une ligne, en pixels, avant le retour à la ligne.
+  largeur-ligne: 200
+  # Hauteur, en blocs, du bas du nom au-dessus des pieds de Jake, pour une
+  # apparence sans « hauteur ».
   hauteur: 2.1
+
+bulle:
+  # Bulle de Jake quand il parle à un joueur, au-dessus du nom (à la place de
+  # l'alerte le temps de la réplique). Format du texte dans messages.yml (bulle).
+  # Fond : transparent, default ou #AARRGGBB.
+  fond: transparent
+  largeur-ligne: 150
+  # Ticks entre deux mots écrits. 0 = toute la réplique d'un coup.
+  ticks-par-mot: 2
+  # Une fois écrite, la bulle reste duree-base-secondes + duree-par-caractere
+  # secondes par caractère de la réplique, puis disparaît.
+  duree-base-secondes: 2.5
+  duree-par-caractere: 0.06
+  # Ticks pour apparaître en grossissant et disparaître en rétrécissant. 0 = d'un coup.
+  apparition-ticks: 3
 
 clic:
   # Commande lancée par le joueur qui clique sur Jake. Vide = aucune.
@@ -120,6 +160,9 @@ clic:
   membres: true
   # Délai minimal, en millisecondes, entre deux clics pris en compte.
   delai-ms: 500
+  # Animation du modèle jouée pour le joueur qui clique (si le modèle l'a), en
+  # même temps que la commande. Vide = aucune.
+  animation: clic
 
 # /jake sans argument : commande lancée par le joueur à la place des réglages de Jake. Vide = les réglages.
 # Les réglages restent sur /jake reglages et sur Accroupi + clic.
@@ -130,19 +173,69 @@ jake-sans-argument:
 # a tapé. Vide = la liste des commandes. « suggestions » s'ajoute à la touche Tab.
 jake-argument-inconnu:
   commande: ""
-  suggestions: []
+  suggestions:
 
 alerte:
-  # Ligne au-dessus de l'hologramme de Jake (messages.yml, alerte), montrée à un membre de l'île seulement, quand le
+  # Ligne au-dessus du nom de Jake (messages.yml, alerte), montrée à un membre de l'île seulement, quand le
   # placeholder vaut « valeur » pour lui. Ses lignes peuvent contenir des placeholders, lus pour ce joueur. Demande
-  # PlaceholderAPI et FancyHolograms.
+  # PlaceholderAPI.
   actif: false
-  placeholder: "%shguide_alerte%"
+  placeholder: "%player_name%"
   valeur: "oui"
-  # Hauteur, en blocs, au-dessus du bas de l'hologramme.
+  # Hauteur, en blocs, au-dessus du bas du nom (l'alerte et les bulles).
   decalage: 0.6
   # Intervalle, en ticks, entre deux lectures des placeholders pour un même joueur.
   verification-ticks: 20
+
+# Réactions de Jake, jouées pour le seul joueur concerné. Une réaction se lance :
+#  - par commande, pour un joueur : /shislandjake react <joueur> <réaction> [texte] (d'autres plugins, menus...) ;
+#  - et, avec « approche: true », quand le joueur arrive à moins de « distance » blocs du Jake près duquel il se
+#    trouve (passage de dehors à dedans, avec 1 bloc de marge : un joueur qui reste près ne la relance pas). La
+#    réaction d'approche possible de plus haute priorité gagne ; une seule par arrivée.
+# Une réaction est abandonnée sans message si le joueur n'est pas près d'un Jake qu'il voit (« portee-commande »),
+# si elle n'est pas pour lui (« pour »), en pause, ou si une condition est fausse. Si le joueur a un menu ouvert, elle
+# attend sa fermeture (« attente-menu-secondes » au plus, une seule en attente : la dernière demandée). Un joueur qui a
+# rendu Jake discret (/jake discret) ne reçoit ni bulle, ni geste, ni son, ni particules.
+#
+# Clés d'une réaction (toutes facultatives) :
+#   approche        true : se lance aussi à l'arrivée du joueur près de Jake
+#   si              conditions lues pour le joueur, toutes vraies : « %placeholder% >= 1 », « == oui », « != / »,
+#                   « ~ expression régulière » (>, <, >=, <= comparent des nombres ; ==, != des nombres ou du texte)
+#   pour            membres (défaut), visiteurs ou tous
+#   animation       animation du modèle jouée pour ce joueur (ignorée par un corps qui ne l'a pas)
+#   repliques       nom d'une liste de messages.yml (repliques.<caractère>.<liste>, sinon repliques.defaut.<liste>) ;
+#                   une ligne tirée au hasard, jamais deux fois de suite la même
+#   son, volume, pitch   son joué au joueur, à la place de Jake ; vide = types.<apparence>.sons.<réaction>, sinon
+#                   aucun. Un son n'est joué qu'avec un geste, une bulle ou des particules.
+#   particules      « NOM nombre » (HAPPY_VILLAGER 8), envoyées à ce joueur seul, autour de Jake
+#   pause-secondes  délai avant de pouvoir rejouer pour ce joueur (en mémoire, remis à zéro au redémarrage)
+#   priorite        à l'arrivée, la réaction possible de plus haute priorité gagne (défaut 0)
+reactions:
+  # Distance, en blocs, de l'arrivée près de Jake.
+  distance: 6
+  # Distance, en blocs, à laquelle une réaction demandée par commande se joue ; plus loin, elle est abandonnée.
+  portee-commande: 16
+  # Secondes pendant lesquelles une réaction attend la fermeture du menu ouvert du joueur.
+  attente-menu-secondes: 30
+  # Ticks sans menu rouvert après une fermeture avant que la réaction parte.
+  menu-ferme-ticks: 3
+  bonjour:
+    approche: true
+    priorite: 0
+    pause-secondes: 900
+    animation: coucou
+    repliques: bonjour
+  visiteur:
+    approche: true
+    pour: visiteurs
+    pause-secondes: 900
+    animation: coucou
+    repliques: visiteur
+  joie:
+    animation: joie
+    repliques: joie
+    son: entity.villager.celebrate
+    particules: HAPPY_VILLAGER 8
 
 deplacement:
   # Secondes laissées au joueur pour cliquer sur le bloc où placer Jake.
@@ -154,33 +247,67 @@ sous-commandes-ile:
   - jake
   - npc
 
-# Types que les joueurs peuvent choisir, dans l'ordre du menu. Noms des types
-# Minecraft (VILLAGER, WITCH, IRON_GOLEM...) ; noms affichés dans messages.yml.
+apparences:
+  # Apparence « mob » dessinée quand le modèle d'une apparence est introuvable ou que BlockDisplayCreator est
+  # absent (un avertissement en console par apparence). Vide = la première apparence « mob » de « types ».
+  secours: VILLAGER
+  # Droit exigé en plus du droit d'obtention (types.<ID>.permission) pour utiliser une apparence : les apparences
+  # s'obtiennent en jouant, mais ne s'utilisent qu'avec ce droit (grades VIP). Vide = le droit d'obtention suffit.
+  # Le droit se vérifie au moment du choix.
+  permission-usage: ""
+  # Ancien identifiant → nouveau, appliqué aux Jake de jakes.yml au démarrage et au rechargement : bascule toutes les
+  # îles d'une apparence à une autre. Exemple : « VILLAGER: AVENTURIER ».
+  remplacements:
+  # Zone cliquable d'un modèle quand ni son apparence (zone-clic) ni son dessin ne la donnent, en blocs.
+  zone-clic:
+    largeur: 1.0
+    hauteur: 2.0
+
+# Apparences que les joueurs peuvent choisir, dans l'ordre du menu. L'identifiant est libre (AVENTURIER, VILLAGER...).
+#   modele      nom d'un bloc de BlockDisplayCreator (custom-blocks) : Jake est ce modèle ; taille = son échelle
+#   mob         sans « modele » : type Minecraft dessiné par FancyNpcs (VILLAGER, WITCH...) ; absent = l'identifiant
 #   icone       objet du menu
-#   hauteur     bas de l'hologramme au-dessus des pieds de Jake, en blocs
-#   permission  droit demandé pour choisir ce type ; vide = tout le monde
+#   hauteur     bas du nom au-dessus des pieds de Jake, en blocs ; absent pour un modèle = d'après son dessin
+#   zone-clic   largeur et hauteur de la zone cliquable d'un modèle ; absente = d'après son dessin
+#   permission  droit d'obtention de cette apparence ; vide = tout le monde
+#   caractere   jeu de répliques (messages.yml, repliques.<caractère>) ; absent = defaut
+#   sons        son de chaque réaction pour cette apparence (quand la réaction n'a pas de « son »)
+# Exemple d'apparence dessinée par BlockDisplayCreator :
+#   AVENTURIER:
+#     modele: jake_aventurier
+#     taille: 1.0
+#     icone: SPYGLASS
+#     caractere: aventurier
+#     sons:
+#       bonjour: entity.villager.ambient
 types:
   VILLAGER:
+    mob: VILLAGER
     icone: VILLAGER_SPAWN_EGG
     hauteur: 2.1
     permission: shislandjake.type.villager
   EVOKER:
+    mob: EVOKER
     icone: EVOKER_SPAWN_EGG
     hauteur: 2.1
     permission: shislandjake.type.evoker
   PILLAGER:
+    mob: PILLAGER
     icone: PILLAGER_SPAWN_EGG
     hauteur: 2.1
     permission: shislandjake.type.pillager
   VINDICATOR:
+    mob: VINDICATOR
     icone: VINDICATOR_SPAWN_EGG
     hauteur: 2.1
     permission: shislandjake.type.vindicator
   WANDERING_TRADER:
+    mob: WANDERING_TRADER
     icone: WANDERING_TRADER_SPAWN_EGG
     hauteur: 2.1
     permission: shislandjake.type.wandering_trader
   WITCH:
+    mob: WITCH
     icone: WITCH_SPAWN_EGG
     hauteur: 2.55
     permission: shislandjake.type.witch
@@ -194,7 +321,7 @@ menu:
   jake-objet: PLAYER_HEAD
   # Ticks laissés à la commande du bouton retour pour ouvrir son menu avant que celui-ci se ferme.
   fermeture-ticks: 6
-  # Réglages de Jake. Cases numérotées à partir de 0, en haut à gauche ; -1 = pas de tête de Jake.
+  # Réglages de Jake. Cases numérotées à partir de 0, en haut à gauche ; -1 = pas de bouton (ou pas de tête de Jake).
   principal:
     lignes: 5
     # Objet des autres cases ; vide = cases libres.
@@ -206,14 +333,18 @@ menu:
     materiau-cache: GRAY_DYE
     position: 24
     position-materiau: COMPASS
+    # Jake discret (pour le joueur seul) : objet quand il est discret, et quand il parle.
+    discret: 31
+    materiau-discret: GRAY_DYE
+    materiau-bavard: WRITABLE_BOOK
     retour: 36
     retour-materiau: PAPER
     # Commande lancée par le joueur avec le bouton retour. Vide = pas de bouton.
     retour-commande: is
     # Retour selon le menu d'où vient le joueur : /jake reglages <origine>. Ex. « guide: guide » pour un menu
     # qui ouvre les réglages avec /jake reglages guide.
-    retours: {}
-  # Apparence de Jake : les types prennent les cases dans l'ordre de « types ».
+    retours:
+  # Apparence de Jake : les apparences prennent les cases dans l'ordre de « types ».
   types:
     lignes: 5
     remplissage: ''
@@ -235,7 +366,7 @@ sons:
   clic: block.anvil.break
   # Ouverture des réglages de Jake.
   menu: ui.toast.in
-  # Type choisi, Jake déplacé.
+  # Apparence choisie, Jake déplacé, Jake discret ou bavard.
   succes: entity.villager.yes
-  # Refus : type réservé, bloc hors de l'île, pas membre de l'île.
+  # Refus : apparence réservée, bloc hors de l'île, pas membre de l'île.
   refus: entity.villager.no

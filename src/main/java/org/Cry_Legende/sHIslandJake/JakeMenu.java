@@ -4,7 +4,6 @@ import com.bgsoftware.superiorskyblock.api.island.Island;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -19,7 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Réglages de Jake (apparence, visibilité, position) et choix de l'apparence. Ouvert et cliqué sur le fil principal.
+ * Réglages de Jake (apparence, visibilité, position, Jake discret) et choix de l'apparence. Ouvert et cliqué sur le
+ * fil principal.
  */
 final class JakeMenu implements InventoryHolder {
 
@@ -33,7 +33,7 @@ final class JakeMenu implements InventoryHolder {
     private final UUID island;
     /** Commande du bouton retour, gardée quand le menu se rouvre (visibilité, choix du type). */
     private final String back;
-    private final Map<Integer, EntityType> typeSlots = new HashMap<>();
+    private final Map<Integer, Settings.Apparence> typeSlots = new HashMap<>();
     private Inventory inventory;
 
     private JakeMenu(SHIslandJake plugin, Kind kind, UUID island, String back) {
@@ -85,10 +85,11 @@ final class JakeMenu implements InventoryHolder {
         Settings s = plugin.settings();
         List<String> typeLines = new ArrayList<>();
         boolean otherAllowed = false;
-        for (Settings.TypeSettings type : s.types.values()) {
-            String key = type.type() == d.type() ? "menu.principal.type.ligne-actuel" : "menu.principal.type.ligne";
-            typeLines.add(m.text(key, "type", m.typeName(type.type())));
-            otherAllowed |= type.type() != d.type() && type.allowed(player);
+        for (Settings.Apparence type : s.types.values()) {
+            boolean current = type.id().equals(d.type());
+            typeLines.add(m.text(current ? "menu.principal.type.ligne-actuel" : "menu.principal.type.ligne",
+                    "type", m.typeName(type.id())));
+            otherAllowed |= !current && s.etat(player, type) == Settings.Etat.DISPONIBLE;
         }
         String reserve = otherAllowed ? null : m.text("menu.principal.type.reserve");
         List<String> lore = new ArrayList<>();
@@ -103,9 +104,7 @@ final class JakeMenu implements InventoryHolder {
                 lore.add(line);
             }
         }
-        Settings.TypeSettings current = s.types.get(d.type());
-        Material icon = current != null ? current.icon() : Material.VILLAGER_SPAWN_EGG;
-        put(s.typeSlot, item(icon, m.text("menu.principal.type.nom", "nom", name), lore));
+        put(s.typeSlot, item(s.apparence(d.type()).icon(), m.text("menu.principal.type.nom", "nom", name), lore));
 
         String state = d.visible() ? "visible" : "cache";
         put(s.visibilitySlot, item(d.visible() ? s.visibleMaterial : s.hiddenMaterial,
@@ -117,25 +116,38 @@ final class JakeMenu implements InventoryHolder {
         put(s.positionSlot, item(s.positionMaterial, m.text("menu.principal.position.nom", "nom", name),
                 m.lines("menu.principal.position.description", "nom", name)));
 
+        boolean discret = plugin.discret().est(player.getUniqueId());
+        String mode = discret ? "discret" : "bavard";
+        put(s.discreetSlot, item(discret ? s.discreetMaterial : s.talkativeMaterial,
+                m.text("menu.principal.discret.nom", "nom", name),
+                m.lines("menu.principal.discret.description", "nom", name,
+                        "etat", m.text("menu.principal.discret.etat-" + mode, "nom", name),
+                        "action", m.text("menu.principal.discret.action-" + mode, "nom", name))));
+
         if (!back.isEmpty()) {
             put(s.backSlot, item(s.backMaterial, m.text("menu.principal.retour.nom"), List.of()));
         }
     }
 
+    /** Une carte par apparence : actuelle, utilisable, pas obtenue, ou obtenue mais réservée à un autre grade. */
     private void buildTypes(Player player, JakeData d) {
         Messages m = plugin.messages();
         Settings s = plugin.settings();
         List<Integer> slots = s.typesSlots;
         int index = 0;
-        for (Settings.TypeSettings type : s.types.values()) {
+        for (Settings.Apparence type : s.types.values()) {
             if (index >= slots.size()) {
-                plugin.getLogger().warning("menu.types.cases : pas assez de cases pour tous les types.");
+                plugin.getLogger().warning("menu.types.cases : pas assez de cases pour toutes les apparences.");
                 break;
             }
             int slot = slots.get(index++);
-            String typeName = m.typeName(type.type());
-            String jakeName = m.jakeName(type.type());
-            String state = type.type() == d.type() ? "actuel" : type.allowed(player) ? "disponible" : "reserve";
+            String typeName = m.typeName(type.id());
+            String jakeName = m.jakeName(type.id());
+            String state = type.id().equals(d.type()) ? "actuel" : switch (s.etat(player, type)) {
+                case DISPONIBLE -> "disponible";
+                case NON_OBTENUE -> "non-obtenue";
+                case RESERVE -> "reserve";
+            };
             ItemStack stack = item(type.icon(), m.text("menu.types.type.nom", "type", typeName, "jake", jakeName),
                     m.lines("menu.types.type." + state, "type", typeName, "jake", jakeName));
             if (state.equals("actuel")) {
@@ -144,7 +156,7 @@ final class JakeMenu implements InventoryHolder {
                 stack.setItemMeta(meta);
             }
             put(slot, stack);
-            typeSlots.put(slot, type.type());
+            typeSlots.put(slot, type);
         }
         put(s.typesBackSlot, item(s.typesBackMaterial, m.text("menu.types.retour.nom"), List.of()));
     }
@@ -167,6 +179,9 @@ final class JakeMenu implements InventoryHolder {
             } else if (slot == s.positionSlot) {
                 player.closeInventory();
                 plugin.commands().startMove(player, jake);
+            } else if (slot == s.discreetSlot) {
+                plugin.commands().toggleDiscreet(player);
+                open(plugin, player, Kind.MAIN, jake, back);
             } else if (slot == s.backSlot && !back.isEmpty()) {
                 goBack(player);
             }
@@ -176,7 +191,7 @@ final class JakeMenu implements InventoryHolder {
             open(plugin, player, Kind.MAIN, jake, back);
             return;
         }
-        EntityType type = typeSlots.get(slot);
+        Settings.Apparence type = typeSlots.get(slot);
         if (type != null && plugin.commands().changeType(player, jake, type)) {
             open(plugin, player, Kind.TYPES, jake, back);
         }

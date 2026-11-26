@@ -3,7 +3,6 @@ package org.Cry_Legende.sHIslandJake;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.EntityType;
 
 import java.io.File;
 import java.io.IOException;
@@ -150,12 +149,12 @@ final class JakeStore {
         }
     }
 
-    private JakeData parse(String key, String world, String position, String typeName, String visible) {
+    private static JakeData parse(String key, String world, String position, String typeName, String visible) {
         try {
             UUID island = UUID.fromString(key);
             String[] p = position == null ? new String[0] : position.trim().split("\\s+");
-            EntityType type = Settings.entityType(typeName == null ? "VILLAGER" : typeName, log, "jakes.yml " + key);
-            if (world == null || p.length != 5 || type == null) {
+            String type = Remplacements.id(typeName == null ? "VILLAGER" : typeName);
+            if (world == null || p.length != 5 || type.isEmpty()) {
                 return null;
             }
             return new JakeData(island, world, Double.parseDouble(p[0]), Double.parseDouble(p[1]),
@@ -234,7 +233,7 @@ final class JakeStore {
             out.append("    monde: '").append(d.world().replace("'", "''")).append("'\n");
             out.append("    position: '").append(d.x()).append(' ').append(d.y()).append(' ').append(d.z())
                     .append(' ').append(d.yaw()).append(' ').append(d.pitch()).append("'\n");
-            out.append("    type: ").append(d.type().name()).append('\n');
+            out.append("    type: ").append(d.type()).append('\n');
             out.append("    visible: ").append(d.visible()).append('\n');
         }
         return out.toString();

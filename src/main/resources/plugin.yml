@@ -3,30 +3,31 @@ version: '${project.version}'
 main: org.Cry_Legende.sHIslandJake.SHIslandJake
 api-version: '1.21'
 author: Cry_Legende
-description: Jake, le PNJ de chaque île SuperiorSkyblock2, dessiné par FancyNpcs.
+description: Jake, le PNJ de chaque île SuperiorSkyblock2, qui parle et réagit à ce que fait le joueur.
 depend:
   - SuperiorSkyblock2
   - FancyNpcs
+  - packetevents
 softdepend:
-  - FancyHolograms
+  - BlockDisplayCreator
   - HeadDatabase
   - PlaceholderAPI
 
 commands:
   jake:
     description: Jake, le PNJ de votre île, et ses réglages.
-    usage: /<command> [reglages|deplacer|visibilite|type]
+    usage: /<command> [reglages|deplacer|visibilite|type|discret]
     aliases:
       - jack
       - islandnpc
       - isnpc
   shislandjake:
     description: Administration de SHIslandJake.
-    usage: /<command> <reload|info|delete|import|stats>
+    usage: /<command> <reload|info|delete|import|stats|react|say>
 
 permissions:
   shislandjake.use:
-    description: Ouvrir Jake et ses réglages (/jake, /is jake) et choisir son apparence.
+    description: Ouvrir Jake et ses réglages (/jake, /is jake), choisir son apparence, rendre Jake discret.
     default: true
   shislandjake.deplacer:
     description: Déplacer Jake sur son île (/jake deplacer).
@@ -35,7 +36,7 @@ permissions:
     description: Cacher ou montrer Jake (/jake visibilite).
     default: true
   shislandjake.type.*:
-    description: Tous les types de Jake de la configuration par défaut.
+    description: Toutes les apparences de Jake de la configuration par défaut.
     default: op
     children:
       shislandjake.type.villager: true
@@ -62,6 +63,9 @@ permissions:
   shislandjake.type.witch:
     description: Jake en sorcière (Jakie).
     default: op
+  shislandjake.personnages:
+    description: Utiliser les apparences obtenues (droit d'usage proposé pour apparences.permission-usage, grades VIP).
+    default: op
   shislandjake.bypass:
     description: Cliquer sur le Jake de n'importe quelle île.
     default: op
@@ -74,10 +78,13 @@ permissions:
       shislandjake.admin.delete: true
       shislandjake.admin.import: true
       shislandjake.admin.stats: true
+      shislandjake.admin.react: true
+      shislandjake.admin.say: true
       shislandjake.bypass: true
       shislandjake.type.*: true
+      shislandjake.personnages: true
   shislandjake.admin.reload:
-    description: Recharger config.yml et messages.yml (/shislandjake reload).
+    description: Recharger config.yml (réactions comprises) et messages.yml (/shislandjake reload).
     default: op
   shislandjake.admin.info:
     description: Nombre de Jake, ou le Jake de l'île d'un joueur (/shislandjake info [joueur]).
@@ -90,4 +97,10 @@ permissions:
     default: op
   shislandjake.admin.stats:
     description: Durée des tâches de Jake sur la dernière minute (/shislandjake stats).
+    default: op
+  shislandjake.admin.react:
+    description: Faire réagir Jake pour un joueur (/shislandjake react <joueur> <réaction> [texte]).
+    default: op
+  shislandjake.admin.say:
+    description: Faire dire une bulle à Jake pour un joueur (/shislandjake say <joueur> <texte>).
     default: op

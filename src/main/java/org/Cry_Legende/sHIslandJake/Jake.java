@@ -5,26 +5,34 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * Le Jake d'une île. Ses données changent par remplacement de {@link JakeData} ; le PNJ FancyNpcs (handle) et
- * l'hologramme ne sont créés qu'au passage d'un joueur, et ne sont touchés que depuis le fil principal.
+ * Le Jake d'une île. Ses données changent par remplacement de {@link JakeData} ; son corps (PNJ FancyNpcs ou modèle de
+ * BlockDisplayCreator) n'est créé qu'au passage d'un joueur et n'est touché que depuis le fil principal. Les textes
+ * et la zone cliquable gardent les mêmes numéros d'entité toute la vie du Jake : un nouvel envoi remplace toujours
+ * ce qu'un joueur aurait gardé.
  */
 final class Jake {
 
-    /** Hologramme d'alerte d'un joueur (gardé en Object, comme l'autre) et le texte qu'il montre. */
-    record Alert(Object hologram, String text) {
-    }
-
     private volatile JakeData data;
+    /** Corps qui le dessine en ce moment ; null tant que personne n'est passé. */
+    private Corps corps;
+    /** Apparence réellement dessinée (celle de secours quand le modèle manque). */
+    private Settings.Apparence dessinee;
     private Npc handle;
-    /** Hologramme FancyHolograms, gardé en Object pour que le plugin tourne sans FancyHolograms. */
-    private Object hologram;
-    /** Ligne d'alerte de chaque joueur qui en voit une : son texte n'est pas le même pour tous. */
-    private final Map<UUID, Alert> alerts = new HashMap<>();
+    /** Modèle montré par BlockDisplayCreator, gardé en Object pour que le plugin tourne sans lui. */
+    private Object modele;
+    /** Bas du nom au-dessus des pieds, et zone cliquable d'un modèle (0 = pas de zone). */
+    private double hauteurTexte;
+    private float zoneLargeur;
+    private float zoneHauteur;
+    private int nomId;
+    private int paroleId;
+    private int zoneId;
+    private UUID nomUuid;
+    private UUID paroleUuid;
+    private UUID zoneUuid;
     private long lastSeen;
 
     Jake(JakeData data) {
@@ -50,6 +58,30 @@ final class Jake {
         return world == null ? null : new Location(world, d.x(), d.y(), d.z(), d.yaw(), d.pitch());
     }
 
+    Corps corps() {
+        return corps;
+    }
+
+    Settings.Apparence dessinee() {
+        return dessinee;
+    }
+
+    /** Le corps qui dessine ce Jake, l'apparence dessinée, la hauteur du nom et la zone cliquable (0 = aucune). */
+    void dessine(Corps corps, Settings.Apparence apparence, double hauteurTexte, float zoneLargeur, float zoneHauteur) {
+        this.corps = corps;
+        this.dessinee = apparence;
+        this.hauteurTexte = hauteurTexte;
+        this.zoneLargeur = zoneLargeur;
+        this.zoneHauteur = zoneHauteur;
+    }
+
+    void efface() {
+        this.corps = null;
+        this.dessinee = null;
+        this.zoneLargeur = 0;
+        this.zoneHauteur = 0;
+    }
+
     Npc handle() {
         return handle;
     }
@@ -58,16 +90,66 @@ final class Jake {
         this.handle = handle;
     }
 
-    Object hologram() {
-        return hologram;
+    Object modele() {
+        return modele;
     }
 
-    void setHologram(Object hologram) {
-        this.hologram = hologram;
+    void setModele(Object modele) {
+        this.modele = modele;
     }
 
-    Map<UUID, Alert> alerts() {
-        return alerts;
+    double hauteurTexte() {
+        return hauteurTexte;
+    }
+
+    boolean aUneZone() {
+        return zoneLargeur > 0 && zoneHauteur > 0;
+    }
+
+    float zoneLargeur() {
+        return zoneLargeur;
+    }
+
+    float zoneHauteur() {
+        return zoneHauteur;
+    }
+
+    /** Numéros d'entité des textes et de la zone, tirés une fois (au premier joueur qui voit ce Jake). */
+    void numeros(int nom, int parole, int zone) {
+        this.nomId = nom;
+        this.paroleId = parole;
+        this.zoneId = zone;
+        this.nomUuid = UUID.randomUUID();
+        this.paroleUuid = UUID.randomUUID();
+        this.zoneUuid = UUID.randomUUID();
+    }
+
+    boolean numerote() {
+        return nomId != 0;
+    }
+
+    int nomId() {
+        return nomId;
+    }
+
+    int paroleId() {
+        return paroleId;
+    }
+
+    int zoneId() {
+        return zoneId;
+    }
+
+    UUID nomUuid() {
+        return nomUuid;
+    }
+
+    UUID paroleUuid() {
+        return paroleUuid;
+    }
+
+    UUID zoneUuid() {
+        return zoneUuid;
     }
 
     long lastSeen() {
@@ -78,6 +160,7 @@ final class Jake {
         lastSeen = now;
     }
 
+    /** Joueur parti : le PNJ FancyNpcs l'oublie. */
     void forget(UUID player) {
         if (handle != null) {
             handle.getIsVisibleForPlayer().remove(player);

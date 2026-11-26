@@ -2,11 +2,9 @@ package org.Cry_Legende.sHIslandJake;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.EntityType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,15 +45,15 @@ public final class Messages {
         return lines;
     }
 
-    /** Nom affiché du type (types.<TYPE>.nom), à défaut le nom Minecraft. */
-    public String typeName(EntityType type) {
-        String name = file.getString("types." + type.name() + ".nom");
+    /** Nom affiché de l'apparence (types.<ID>.nom), à défaut son identifiant. */
+    public String typeName(String type) {
+        String name = file.getString("types." + type + ".nom");
         return name == null || name.isEmpty() ? pretty(type) : name;
     }
 
-    /** Nom de Jake sous ce type (types.<TYPE>.jake), à défaut types.defaut-jake. */
-    public String jakeName(EntityType type) {
-        String name = file.getString("types." + type.name() + ".jake");
+    /** Nom de Jake sous cette apparence (types.<ID>.jake), à défaut types.defaut-jake. */
+    public String jakeName(String type) {
+        String name = file.getString("types." + type + ".jake");
         if (name == null || name.isEmpty()) {
             name = file.getString("types.defaut-jake");
         }
@@ -71,11 +69,6 @@ public final class Messages {
         return LEGACY.deserialize(text).decorationIfAbsent(TextDecoration.ITALIC, TextDecoration.State.FALSE);
     }
 
-    /** Texte & converti en MiniMessage, la forme que FancyNpcs et FancyHolograms lisent. */
-    public static String miniMessage(String text) {
-        return MiniMessage.miniMessage().serialize(LEGACY.deserialize(text));
-    }
-
     public static String replace(String text, String... replacements) {
         if (text == null) {
             return "";
@@ -86,8 +79,8 @@ public final class Messages {
         return text;
     }
 
-    private static String pretty(EntityType type) {
-        String name = type.name().toLowerCase(Locale.ROOT).replace('_', ' ');
-        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    private static String pretty(String type) {
+        String name = type.toLowerCase(Locale.ROOT).replace('_', ' ');
+        return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 }

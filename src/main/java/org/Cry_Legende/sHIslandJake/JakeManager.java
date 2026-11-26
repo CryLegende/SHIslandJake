@@ -2,8 +2,6 @@ package org.Cry_Legende.sHIslandJake;
 
 import com.bgsoftware.superiorskyblock.api.island.Island;
 import org.bukkit.Location;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -96,7 +94,7 @@ final class JakeManager {
         tracker.refreshAround(jake);
     }
 
-    void setType(Jake jake, EntityType type) {
+    void setType(Jake jake, String type) {
         display.release(jake);
         jake.setData(jake.data().withType(type));
         store.markDirty();
@@ -153,9 +151,27 @@ final class JakeManager {
         return orphans.size();
     }
 
-    /** Le joueur peut-il choisir ce type ? */
-    boolean allowed(Player player, EntityType type) {
-        Settings.TypeSettings settings = plugin.settings().types.get(type);
-        return settings != null && settings.allowed(player);
+    /**
+     * apparences.remplacements appliqué aux Jake déjà chargés (rechargement) : ceux qui changent sont redessinés.
+     * Renvoie le nombre de Jake changés.
+     */
+    int applyReplacements(Remplacements remplacements) {
+        if (remplacements.vide()) {
+            return 0;
+        }
+        int changed = 0;
+        for (Jake jake : new ArrayList<>(registry.all())) {
+            String type = jake.data().type();
+            String replaced = remplacements.appliquer(type);
+            if (!replaced.equals(type)) {
+                display.release(jake);
+                jake.setData(jake.data().withType(replaced));
+                changed++;
+            }
+        }
+        if (changed > 0) {
+            store.markDirty();
+        }
+        return changed;
     }
 }

@@ -12,12 +12,16 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.server.PluginDisableEvent;
+import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 
@@ -43,7 +47,10 @@ final class JakeListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        plugin.sync(() -> plugin.tracker().join(player));
+        plugin.sync(() -> {
+            plugin.discret().charger(player);
+            plugin.tracker().join(player);
+        });
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -63,6 +70,8 @@ final class JakeListener implements Listener {
         plugin.sync(() -> {
             plugin.moves().forget(player.getUniqueId());
             plugin.tracker().quit(player);
+            plugin.reactions().oublier(player.getUniqueId());
+            plugin.discret().oublier(player.getUniqueId());
         });
     }
 
@@ -72,13 +81,48 @@ final class JakeListener implements Listener {
         plugin.sync(() -> plugin.tracker().refreshSoon(player));
     }
 
+    /** Le client a changé de monde : tout ce qu'il avait reçu est détruit puis renvoyé (pas de copie figée). */
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         plugin.sync(() -> {
             plugin.moves().cancel(player);
-            plugin.tracker().refreshSoon(player);
+            plugin.tracker().reset(player);
         });
+    }
+
+    /** Une réapparition dans le même monde garde les entités du client : elles sont détruites puis renvoyées. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        plugin.sync(() -> {
+            if (player.isOnline()) {
+                plugin.tracker().reset(player);
+            }
+        });
+    }
+
+    /** Une réaction attendait peut-être la fermeture de ce menu. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onMenuClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            plugin.sync(() -> plugin.reactions().fermeture(player));
+        }
+    }
+
+    /** BlockDisplayCreator arrive ou repart : les Jake sont redessinés avec le corps qui convient. */
+    @EventHandler
+    public void onPluginEnable(PluginEnableEvent event) {
+        if (event.getPlugin().getName().equals("BlockDisplayCreator")) {
+            plugin.sync(() -> plugin.display().releaseAll());
+        }
+    }
+
+    @EventHandler
+    public void onPluginDisable(PluginDisableEvent event) {
+        if (event.getPlugin().getName().equals("BlockDisplayCreator") && plugin.isEnabled()) {
+            plugin.sync(() -> plugin.display().releaseAll());
+        }
     }
 
     //CLIC SUR JAKE----------
@@ -118,6 +162,10 @@ final class JakeListener implements Listener {
         if (settings.sneakOpensMenu && player.isSneaking() && member) {
             plugin.commands().openMenu(player);
             return;
+        }
+        // le geste du clic (s'il existe) pour ce joueur seul ; la commande part tout de suite
+        if (!plugin.discret().est(player.getUniqueId())) {
+            plugin.display().jouer(jake, settings.clickAnimation, player);
         }
         if (!settings.clickCommand.isEmpty()) {
             plugin.sound(player, settings.soundClick);
