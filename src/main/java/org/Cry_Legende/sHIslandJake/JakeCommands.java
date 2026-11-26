@@ -170,9 +170,16 @@ final class JakeCommands {
     }
 
     /** Vrai si l'apparence a changé. Les droits sont vérifiés ici, au moment du choix. */
-    boolean changeType(Player player, Jake jake, Settings.Apparence type) {
+    boolean changeType(Player player, Jake jake, Settings.Apparence choisie) {
         Settings s = plugin.settings();
-        String typeName = plugin.messages().typeName(type.id());
+        String typeName = plugin.messages().typeName(choisie.id());
+        // relue au moment du choix : le menu a pu rester ouvert pendant un rechargement
+        Settings.Apparence type = s.types.get(choisie.id());
+        if (type == null) {
+            plugin.sound(player, s.soundRefusal);
+            plugin.messages().send(player, "type-inconnu", "type", typeName);
+            return false;
+        }
         if (s.remplacee(type.id())) {
             plugin.sound(player, s.soundRefusal);
             plugin.messages().send(player, "type-remplace", "type", typeName);

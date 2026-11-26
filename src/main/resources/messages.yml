@@ -209,8 +209,9 @@ menu:
         - '&8&l« &fRéglez-moi comme vous voulez ! &8&l»'
     type:
       nom: '&dApparence de {nom}'
-      # {types} = une ligne par apparence (ligne, ligne-actuel), {reserve} = ligne
-      # « reserve » quand le joueur ne peut utiliser aucune autre apparence.
+      # {types} = une ligne par apparence (ligne, ligne-actuel). {reserve} = ligne « reserve » quand aucune autre
+      # apparence n'est utilisable et qu'une est obtenue mais réservée aux grades, « a-obtenir » quand les autres
+      # restent à obtenir ; rien sans autre apparence ou quand une autre est utilisable.
       description:
         - ''
         - '&8&l« &7Choisissez à quoi ressemble {nom}. &8&l»'
@@ -222,6 +223,8 @@ menu:
       ligne: ' &8• &7{type}'
       ligne-actuel: ' &d✔ &f{type}'
       reserve: ' &8✘ &7Les autres sont réservées aux grades &dVIP&7.'
+      # {reserve} quand les autres apparences restent à obtenir en jouant.
+      a-obtenir: ' &8✘ &7Les autres s''obtiennent en jouant.'
     visibilite:
       nom: '&aVisibilité de {nom}'
       # {etat} = etat-visible ou etat-cache, {action} = action-visible ou action-cache.

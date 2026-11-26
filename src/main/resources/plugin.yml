@@ -64,8 +64,8 @@ permissions:
     description: Jake en sorcière (Jakie).
     default: op
   shislandjake.personnages:
-    description: Utiliser les apparences obtenues (apparences.permission-usage), à donner aux grades VIP et plus ; jamais aux op d'office.
-    default: false
+    description: Utiliser les apparences obtenues (apparences.permission-usage), donné aux grades VIP et plus.
+    default: op
   shislandjake.bypass:
     description: Cliquer sur le Jake de n'importe quelle île.
     default: op

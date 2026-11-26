@@ -159,7 +159,8 @@ final class CorpsModele implements Corps {
             noms = new java.util.HashSet<>();
             if (lu instanceof Collection<?> c) {
                 for (Object o : c) {
-                    noms.add(String.valueOf(o));
+                    // le moteur lit les noms d'animation sans tenir compte des majuscules
+                    noms.add(String.valueOf(o).toLowerCase(java.util.Locale.ROOT));
                 }
             }
             // un modèle pas encore lu par le moteur n'est pas gardé : il sera relu
@@ -167,11 +168,47 @@ final class CorpsModele implements Corps {
                 animations.put(modele, noms);
             }
         }
-        return noms.isEmpty() || noms.contains(animation);
+        return noms.isEmpty() || noms.contains(animation.toLowerCase(java.util.Locale.ROOT));
     }
 
     void oublierAnimations() {
         animations.clear();
+    }
+
+    /**
+     * Moteur qui ne donne pas la durée des animations : chaque animation d'une apparence (scènes, vie, gestes des
+     * réactions, clic) sans ambiance.durees est signalée une fois, avec la durée prise à sa place. Au démarrage, au
+     * rechargement et quand le moteur change.
+     */
+    void signalerDurees(java.util.Set<String> dejaSignalees) {
+        if (api == null || api.duration() != null) {
+            return;
+        }
+        Settings s = plugin.settings();
+        java.util.Set<String> gestes = new java.util.LinkedHashSet<>();
+        for (ReglagesReactions.Reaction r : s.reactions.toutes().values()) {
+            if (r.animation() != null && !r.animation().isEmpty()) {
+                gestes.add(r.animation());
+            }
+        }
+        if (!s.clickAnimation.isEmpty()) {
+            gestes.add(s.clickAnimation);
+        }
+        for (Settings.Apparence a : s.types.values()) {
+            if (!a.estModele()) {
+                continue;
+            }
+            java.util.Set<String> noms = new java.util.LinkedHashSet<>(a.scenes());
+            noms.addAll(a.vie());
+            noms.addAll(gestes);
+            for (String n : noms) {
+                if (!s.dureeEcrite(a.modele(), n) && aAnimation(a.modele(), n) && dejaSignalees.add(a.modele() + "/" + n)) {
+                    plugin.getLogger().warning("BlockDisplayCreator ne donne pas la durée des animations : « " + n
+                            + " » du modèle « " + a.modele() + " » compte pour " + s.animationTicks(a.modele(), n) / 20.0
+                            + " s (ambiance.durees." + a.modele() + "." + n + ").");
+                }
+            }
+        }
     }
 
     /** Montre le modèle de l'apparence du Jake. */

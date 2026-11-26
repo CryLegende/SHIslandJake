@@ -131,6 +131,7 @@ public final class SHIslandJake extends JavaPlugin {
         }
 
         tracker.start();
+        display.signalerDurees(false);
         saveTask = getServer().getScheduler().runTaskTimer(this, () -> store.flush(registry), SAVE_TICKS, SAVE_TICKS);
         cleanTask = getServer().getScheduler().runTaskTimer(this, () -> reactions.nettoyer(), CLEAN_TICKS, CLEAN_TICKS);
         // un « /bdc reload » peut rallumer ou éteindre le rendu du moteur sans activer ni arrêter le plugin
@@ -197,11 +198,9 @@ public final class SHIslandJake extends JavaPlugin {
 
     //RECHARGEMENT----------
 
-    /** Le guide du staff (LISEZ-MOI.txt) est reposé à côté de config.yml s'il manque. */
+    /** Le guide du staff (LISEZ-MOI.txt) est réécrit à côté de config.yml : il suit toujours la version du jar. */
     private void poserGuide() {
-        if (!new File(getDataFolder(), "LISEZ-MOI.txt").exists()) {
-            saveResource("LISEZ-MOI.txt", false);
-        }
+        saveResource("LISEZ-MOI.txt", true);
     }
 
     /** Relit config.yml (réactions comprises) et messages.yml ; un fichier invalide laisse l'ancienne configuration. */
@@ -231,6 +230,7 @@ public final class SHIslandJake extends JavaPlugin {
             getLogger().info("apparences.remplacements : " + replaced + " Jake ont changé d'apparence.");
         }
         tracker.start();
+        display.signalerDurees(true);
         messages.send(sender, "recharge", "reactions", String.valueOf(newSettings.reactions.toutes().size()));
     }
 

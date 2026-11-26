@@ -377,6 +377,12 @@ public final class Settings {
     }
 
     /** Durée d'une animation d'un modèle selon la configuration (ambiance.durees, sinon duree-defaut-secondes), en ticks. */
+    /** La durée de cette animation est-elle écrite dans ambiance.durees ? */
+    public boolean dureeEcrite(String modele, String animation) {
+        Map<String, Integer> m = animationTicks.get(modele);
+        return m != null && m.containsKey(animation);
+    }
+
     public int animationTicks(String modele, String animation) {
         Map<String, Integer> m = animationTicks.get(modele);
         Integer t = m == null ? null : m.get(animation);

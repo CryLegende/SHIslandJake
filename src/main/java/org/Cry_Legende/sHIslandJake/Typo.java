@@ -10,7 +10,8 @@ import java.util.regex.Pattern;
 final class Typo {
 
     private static final char INSECABLE = ' ';
-    private static final Pattern AVANT = Pattern.compile(" +(?=[!?:;»])");
+    /** Espaces devant le signe, codes couleur (&a, &#RRGGBB) permis entre les deux. */
+    private static final Pattern AVANT = Pattern.compile(" +(?=(?:&[0-9a-fk-orA-FK-OR]|&#\\p{XDigit}{6})*[!?:;»])");
     private static final Pattern APRES = Pattern.compile("(?<=«) +");
 
     private Typo() {

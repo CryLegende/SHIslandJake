@@ -22,6 +22,7 @@ final class JakeDisplay {
     private final JakeRegistry registry;
     private final CorpsMob mob;
     private final CorpsModele modele;
+    private final java.util.Set<String> dureesSignalees = new java.util.HashSet<>();
     private final Textes textes;
     /** Avertissements déjà écrits (apparence sans modèle, scène absente d'un modèle). */
     private final Set<String> signales = new HashSet<>();
@@ -358,7 +359,16 @@ final class JakeDisplay {
     void moteurChange() {
         if (modele.revoir()) {
             releaseAll();
+            modele.signalerDurees(dureesSignalees);
         }
+    }
+
+    /** Démarrage ou rechargement : les durées d'animation que personne ne donne sont signalées (une fois chacune). */
+    void signalerDurees(boolean rechargement) {
+        if (rechargement) {
+            dureesSignalees.clear();
+        }
+        modele.signalerDurees(dureesSignalees);
     }
 
     /** Joueur parti : les PNJ l'oublient. */

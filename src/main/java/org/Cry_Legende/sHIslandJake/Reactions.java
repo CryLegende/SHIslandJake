@@ -213,6 +213,7 @@ final class Reactions {
         if (plugin.display().jouer(jake, s.clickAnimation, player)) {
             int duree = plugin.display().duree(jake, s.clickAnimation);
             ambiance.reaction(id, tick, duree, duree, ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
+            reprendreApres(player, jake, duree);
         }
     }
 
@@ -243,6 +244,7 @@ final class Reactions {
             Settings s = plugin.settings();
             ambiance.reaction(id, tick, Math.max(dureeBulle, dureeGeste), dureeGeste,
                     ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
+            reprendreApres(player, jake, dureeGeste);
         }
     }
 
@@ -380,14 +382,20 @@ final class Reactions {
         if (!ambiance.libre(id, tick) || plugin.discret().est(id) || plugin.textes().parle(id) || attentes.contient(id)) {
             return;
         }
-        List<String> scenes = apparence(jake).scenes().stream().filter(sc -> plugin.display().animationConnue(jake, sc)).toList();
+        List<String> toutes = apparence(jake).scenes();
+        if (toutes.isEmpty()) {
+            return;
+        }
+        List<String> scenes = toutes.stream().filter(sc -> plugin.display().animationConnue(jake, sc)).toList();
         if (scenes.isEmpty()) {
             return;
         }
         String scene = ambiance.tirer(id, scenes);
         int pause = ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks);
         if (plugin.display().jouer(jake, scene, player)) {
-            ambiance.scene(id, scene, tick, plugin.display().duree(jake, scene), pause);
+            int duree = plugin.display().duree(jake, scene);
+            ambiance.scene(id, scene, tick, duree, pause);
+            reprendreApres(player, jake, duree);
         } else {
             // scène refusée par le moteur : pas de nouvel essai avant la pause
             ambiance.scene(id, scene, tick, 0, pause);
@@ -406,7 +414,7 @@ final class Reactions {
             prevue.cancel();
         }
         int tick = Bukkit.getCurrentTick();
-        boolean vu = player.isOnline() && regarde.get(id) == jake && plugin.display().modele(jake);
+        boolean vu = player.isOnline() && regarde.get(id) == jake && plugin.display().modele(jake) && pres(player, jake);
         boolean permise = s.vieEnabled && (s.vieSiDiscret || !plugin.discret().est(id));
         switch (ambiance.decider(id, tick, vu, permise)) {
             case ARRETER -> ambiance.finVie(id);
@@ -422,6 +430,43 @@ final class Reactions {
                     ambiance.finVie(id);
                 }
             }
+        }
+    }
+
+    /**
+     * Un geste ou une scène vient de remplacer la vie de ce joueur (ou part pendant qu'il regarde Jake) : la suite est
+     * replanifiée à la fin exacte de ce geste, l'ancienne tâche (calée sur la fin de l'animation de vie interrompue)
+     * est annulée.
+     */
+    private void reprendreApres(Player player, Jake jake, int duree) {
+        UUID id = player.getUniqueId();
+        if (duree > 0 && plugin.settings().vieEnabled && !apparence(jake).vie().isEmpty()
+                && (chaines.containsKey(id) || regarde.get(id) == jake)) {
+            planifier(player, jake, duree);
+        }
+    }
+
+    /** Encore dans le monde de Jake et à portée de l'ambiance (une téléportation a pu l'emmener ailleurs). */
+    private boolean pres(Player player, Jake jake) {
+        JakeData d = jake.data();
+        Location ici = player.getLocation();
+        if (!ici.getWorld().getName().equals(d.world())) {
+            return false;
+        }
+        double dx = ici.getX() - d.x();
+        double dy = ici.getY() - d.y();
+        double dz = ici.getZ() - d.z();
+        double max = plugin.settings().ambianceDistance + 2;
+        return dx * dx + dy * dy + dz * dz <= max * max;
+    }
+
+    /** Plus aucun Jake près de ce joueur (téléportation, changement de monde, réapparition) : sa vie s'arrête là. */
+    void perdu(UUID player) {
+        regarde.remove(player);
+        BukkitTask chaine = chaines.remove(player);
+        if (chaine != null) {
+            chaine.cancel();
+            ambiance.finVie(player);
         }
     }
 

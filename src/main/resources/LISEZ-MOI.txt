@@ -3,8 +3,8 @@ SHIslandJake, le guide du staff
 
 Ce fichier explique comment tout changer soi-même : ajouter un personnage, changer ce que Jake
 dit, le faire réagir depuis un autre plugin, faire passer toutes les îles à un autre personnage.
-Il est reposé tel quel s'il manque. Vos changements vont dans config.yml et messages.yml, jamais
-dans ce fichier.
+Il est réécrit à chaque démarrage, pour suivre la version du plugin : vos changements vont dans
+config.yml et messages.yml, jamais dans ce fichier.
 
 Après un changement de config.yml ou de messages.yml, tapez /shislandjake reload. Un fichier mal
 écrit est refusé et nommé dans la console, et l'ancienne configuration reste en place.
@@ -33,6 +33,8 @@ Les animations du modèle suivent quatre règles.
   - Ce qui apparaît ou disparaît (une paupière, un objet sorti du sac) le fait d'un coup, avec
     « over: 0 ». Sinon on le voit grandir puis rétrécir. Une pièce cachée garde une toute petite
     taille (0.001), jamais 0.
+  - Aucun son dans une animation de vie : elles s'enchaînent sans arrêt, un son s'y répéterait
+    toutes les dix secondes. Les sons vont aux réactions.
 
 Chaque animation part de la pose de repos et y revient. Jake en utilise trois sortes.
 
@@ -72,10 +74,11 @@ personnage (voir plus bas).
 
 Les lignes « obtention » sont des conditions, toutes vraies pour obtenir le personnage. Elles
 s'écrivent comme les conditions « si » des réactions : un placeholder, un espace, un opérateur
-(== != >= <= > <), un espace, une valeur. Elles sont lues pour le joueur quand il ouvre le menu
+(== != >= <= > <), un espace, une valeur. L'opérateur ~ compare à une expression régulière
+(« %player_world% ~ ^SuperiorWorld »). Elles sont lues pour le joueur quand il ouvre le menu
 et quand il choisit. Un personnage qui s'obtient ne s'utilise qu'avec le droit écrit dans
-« apparences.permission-usage » (shislandjake.personnages, à donner aux grades VIP et plus ; il
-n'est pas donné aux op). Un personnage sans « obtention » est à tout le monde. Une apparence déjà
+« apparences.permission-usage » (shislandjake.personnages, à donner aux grades VIP et plus). Un
+personnage sans « obtention » est à tout le monde. Une apparence déjà
 choisie n'est jamais retirée.
 
 La ligne « obtention-valeur » est facultative. Avec elle, la carte d'un personnage pas encore

@@ -96,7 +96,7 @@ final class JakeMenu implements InventoryHolder {
         Messages m = plugin.messages();
         Settings s = plugin.settings();
         List<String> typeLines = new ArrayList<>();
-        boolean otherAllowed = false;
+        List<Settings.Etat> autres = new ArrayList<>();
         for (Settings.Apparence type : s.types.values()) {
             if (!s.proposee(type)) {
                 continue;
@@ -104,9 +104,12 @@ final class JakeMenu implements InventoryHolder {
             boolean current = type.id().equals(actuelle);
             typeLines.add(m.text(current ? "menu.principal.type.ligne-actuel" : "menu.principal.type.ligne",
                     "type", m.typeName(type.id())));
-            otherAllowed |= !current && s.etat(player, type) == Settings.Etat.DISPONIBLE;
+            if (!current) {
+                autres.add(s.etat(player, type));
+            }
         }
-        String reserve = otherAllowed ? null : m.text("menu.principal.type.reserve");
+        String cle = Obtention.ligneAutres(autres);
+        String reserve = cle == null ? null : m.text("menu.principal.type." + cle);
         List<String> lore = new ArrayList<>();
         for (String line : m.lines("menu.principal.type.description", "nom", name)) {
             if (line.equals("{types}")) {

@@ -185,6 +185,7 @@ final class JakeTracker {
      */
     void reset(Player player, boolean ailleurs) {
         UUID id = player.getUniqueId();
+        plugin.reactions().perdu(id);
         Map<Jake, Textes.Vue> mine = vues.remove(id);
         looks.remove(id);
         etats.remove(id);
@@ -300,12 +301,15 @@ final class JakeTracker {
             if (mine != null) {
                 leger(player, mine, etat, tick);
                 plugin.reactions().ambiance(player, mine, ici);
+            } else {
+                plugin.reactions().perdu(id);
             }
             return;
         }
         List<Jake> near = nearBuffer;
         registry.near(world.getName(), ici.getBlockX(), ici.getBlockZ(), settings.viewDistance, near);
         if (near.isEmpty() && mine == null) {
+            plugin.reactions().perdu(id);
             etat.complet(world, ici.getX(), ici.getY(), ici.getZ(), tick + settings.fullPassTicks);
             etat.alerteA = Integer.MAX_VALUE;
             etat.membreA = Integer.MAX_VALUE;
@@ -442,6 +446,8 @@ final class JakeTracker {
         }
         if (mine != null) {
             plugin.reactions().ambiance(player, mine, ici);
+        } else {
+            plugin.reactions().perdu(id);
         }
     }
 
@@ -459,6 +465,8 @@ final class JakeTracker {
                     boolean membre = island != null && plugin.islands().canUse(player, island, true);
                     vue.membreRelu = tick + plugin.settings().memberCheckTicks;
                     if (membre != vue.membre) {
+                        // gardée : le passage complet qui suit montre ou retire l'alerte sans relire l'île
+                        vue.membre = membre;
                         etat.salir();
                     }
                 }

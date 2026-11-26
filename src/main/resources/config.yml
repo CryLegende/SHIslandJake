@@ -43,7 +43,8 @@
 #    /jake deplacer             clic sur un bloc de son île pour y placer Jake
 #    /jake visibilite           cache ou montre Jake à tout le monde
 #    /jake type [apparence]     choisit l'apparence de Jake (menu sans argument)
-#    /jake discret              Jake discret pour soi : ni bulle, ni geste, ni son
+#    /jake discret              Jake discret pour soi : ni bulle, ni geste, ni scène, ni son
+#                               (il garde sa vie, ambiance.vie-si-discret)
 #    /jake <autre chose>        lance jake-argument-inconnu.commande
 #
 #  Commandes d'administration (console aussi)
@@ -73,10 +74,11 @@
 #    shislandjake.use             /jake, réglages, apparence, discret (tout le monde)
 #    shislandjake.deplacer        déplacer Jake (tout le monde)
 #    shislandjake.visibilite      cacher ou montrer Jake (tout le monde)
-#    shislandjake.type.<type>     apparences de Jake (voir « types ») ; op par défaut
+#    shislandjake.type.<type>     droit d'obtention d'une apparence qui en demande un
+#                                 (types.<ID>.permission) ; op par défaut
 #    shislandjake.type.*          toutes les apparences de la configuration par défaut (op)
-#    shislandjake.personnages     utiliser les apparences obtenues (apparences.permission-usage) :
-#                                 à donner aux grades VIP et plus, jamais aux op d'office
+#    shislandjake.personnages     utiliser les apparences obtenues (apparences.permission-usage),
+#                                 donné aux grades VIP et plus (op)
 #    shislandjake.bypass          cliquer sur le Jake de n'importe quelle île (op)
 #    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass, type.* (op)
 #    shislandjake.admin.<sous-commande>   reload, info, delete, import, stats, react, say
@@ -304,8 +306,8 @@ apparences:
   # de « types », proposée comme les autres.
   secours: VILLAGER
   # Droit exigé pour utiliser une apparence qui s'obtient (types.<ID>.obtention ou types.<ID>.permission) : elles
-  # s'obtiennent en jouant, mais ne s'utilisent qu'avec ce droit, donné aux grades VIP et plus (shislandjake.personnages
-  # n'est pas donné aux op d'office). Une apparence sans obtention est à tout le monde. Vérifié au moment du choix ;
+  # s'obtiennent en jouant, mais ne s'utilisent qu'avec ce droit, donné aux grades VIP et plus.
+  # Une apparence sans obtention est à tout le monde. Vérifié au moment du choix ;
   # une apparence déjà choisie n'est jamais retirée. Vide = l'obtention suffit.
   permission-usage: shislandjake.personnages
   # Ancien identifiant → nouveau, appliqué aux Jake de jakes.yml au démarrage et au rechargement : fait passer toutes

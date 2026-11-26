@@ -53,6 +53,18 @@ final class Obtention {
         return OptionalDouble.empty();
     }
 
+    /**
+     * Ligne {reserve} du bouton Apparence des réglages, selon l'état des autres apparences proposées : aucune (pas
+     * d'autre apparence, ou une autre est utilisable), « reserve » (une autre est obtenue mais réservée aux grades),
+     * sinon « a-obtenir » (les autres restent à obtenir en jouant).
+     */
+    static String ligneAutres(List<Settings.Etat> autres) {
+        if (autres.isEmpty() || autres.contains(Settings.Etat.DISPONIBLE)) {
+            return null;
+        }
+        return autres.contains(Settings.Etat.RESERVE) ? "reserve" : "a-obtenir";
+    }
+
     /** Un nombre comme on l'écrit : « 10 », « 2,5 ». */
     static String nombre(double n) {
         if (n == Math.rint(n) && Math.abs(n) < 1e15) {

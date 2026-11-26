@@ -141,6 +141,23 @@ class AmbianceTest {
     }
 
     @Test
+    void uneVieLongueInterrompueTotReprendALaFinDuGeste() {
+        // respire (252 ticks) coupé à 10 par le clic (12 ticks) : la vie reprend à 22, pas à 252
+        Ambiance a = new Ambiance(new Random(11));
+        UUID j = UUID.randomUUID();
+        a.vie(j, "respire", 0, 252);
+        a.reaction(j, 10, 12, 12, 300);
+        assertEquals(22, a.reprise(j));
+        assertEquals(Ambiance.Vie.ATTENDRE, a.decider(j, 21, true, true));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 22, true, true));
+        // puis une scène de 160 ticks coupe la vie suivante à 40 : reprise à 200
+        a.vie(j, "respire2", 22, 280);
+        a.scene(j, "carte", 40, 160, 300);
+        assertEquals(200, a.reprise(j));
+        assertEquals(Ambiance.Vie.JOUER, a.decider(j, 200, true, true));
+    }
+
+    @Test
     void unGesteQuiRemplaceUneSceneRendLaVieASaFin() {
         Ambiance a = new Ambiance(new Random(7));
         UUID j = UUID.randomUUID();

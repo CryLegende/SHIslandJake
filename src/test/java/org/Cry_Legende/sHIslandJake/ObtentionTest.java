@@ -74,6 +74,18 @@ class ObtentionTest {
     }
 
     @Test
+    void ligneDesAutresApparencesDuBoutonApparence() {
+        // au lancement : l'Aventurier seul, aucune ligne
+        assertEquals(null, Obtention.ligneAutres(List.of()));
+        // une autre utilisable : aucune ligne
+        assertEquals(null, Obtention.ligneAutres(List.of(Settings.Etat.RESERVE, Settings.Etat.DISPONIBLE)));
+        // une obtenue mais réservée : la ligne des grades
+        assertEquals("reserve", Obtention.ligneAutres(List.of(Settings.Etat.NON_OBTENUE, Settings.Etat.RESERVE)));
+        // toutes à obtenir : pas « réservée VIP », mais à obtenir en jouant
+        assertEquals("a-obtenir", Obtention.ligneAutres(List.of(Settings.Etat.NON_OBTENUE, Settings.Etat.NON_OBTENUE)));
+    }
+
+    @Test
     void conditionCoupeeEnTrois() {
         String[] p = Condition.parties(NIVEAU + " >= 10");
         assertEquals(List.of(NIVEAU, ">=", "10"), List.of(p));

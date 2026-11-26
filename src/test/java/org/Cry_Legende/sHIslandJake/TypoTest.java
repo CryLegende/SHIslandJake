@@ -19,6 +19,10 @@ class TypoTest {
         assertEquals("Bravo" + NB + "!", Typo.insecables("Bravo   !"));
         // avec des codes couleur
         assertEquals("&aBravo &e{joueur}" + NB + "!", Typo.insecables("&aBravo &e{joueur} !"));
+        // un code couleur entre l'espace et le signe
+        assertEquals("Bravo" + NB + "&c!", Typo.insecables("Bravo &c!"));
+        assertEquals("Prêt" + NB + "&#FF8800&l?", Typo.insecables("Prêt &#FF8800&l?"));
+        assertEquals("Fin &aboucle", Typo.insecables("Fin &aboucle"));
     }
 
     @Test
