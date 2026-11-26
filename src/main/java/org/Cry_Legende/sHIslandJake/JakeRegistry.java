@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * Tous les Jake, retrouvables sans parcourir la liste : par île (lisible depuis tout fil, pour les
  * placeholders), par numéro d'entité (clic d'un joueur sur le PNJ ou sur la zone d'un modèle) et par position, dans
  * une grille de cases de 32 blocs. Hors lecture par île et tri des numéros d'entité, tout se fait sur le fil principal.
- * Un compteur de changements dit au suivi qu'un Jake a bougé, changé ou été redessiné.
  */
 final class JakeRegistry {
 
@@ -26,7 +25,6 @@ final class JakeRegistry {
     private final Set<Integer> ids = ConcurrentHashMap.newKeySet();
     private final Map<String, Cases> grid = new HashMap<>();
     private final Set<Jake> drawn = new HashSet<>();
-    private int changes;
 
     Jake get(UUID island) {
         return island == null ? null : islands.get(island);
@@ -40,15 +38,6 @@ final class JakeRegistry {
         return islands.size();
     }
 
-    /** Augmente à chaque changement d'un Jake (place, apparence, visibilité, dessin). */
-    int changes() {
-        return changes;
-    }
-
-    void changed() {
-        changes++;
-    }
-
     /** Remplace le Jake que l'île avait déjà ; renvoie l'ancien. */
     Jake add(Jake jake) {
         Jake previous = islands.put(jake.island(), jake);
@@ -59,7 +48,6 @@ final class JakeRegistry {
             }
         }
         index(jake);
-        changes++;
         return previous;
     }
 
@@ -69,7 +57,6 @@ final class JakeRegistry {
         if (jake.numerote()) {
             unlink(jake.zoneId());
         }
-        changes++;
     }
 
     /** Nouvelles données du Jake, la grille suit sa position. */
@@ -77,7 +64,6 @@ final class JakeRegistry {
         unindex(jake);
         jake.setData(data);
         index(jake);
-        changes++;
     }
 
     void link(int entityId, Jake jake) {
@@ -104,15 +90,11 @@ final class JakeRegistry {
         return drawn;
     }
 
-    /**
-     * Un Jake qui n'est plus dessiné compte comme un changement (ceux qui le voyaient doivent le recevoir de nouveau) ;
-     * un Jake dessiné non : il l'est au passage d'un joueur qui le voit déjà.
-     */
     void markDrawn(Jake jake, boolean drawnNow) {
         if (drawnNow) {
             drawn.add(jake);
-        } else if (drawn.remove(jake)) {
-            changes++;
+        } else {
+            drawn.remove(jake);
         }
     }
 

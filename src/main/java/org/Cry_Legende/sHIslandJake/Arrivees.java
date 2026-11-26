@@ -64,6 +64,11 @@ final class Arrivees {
         return mine != null && mine.contains(ile);
     }
 
+    /** Jake déplacé ou île supprimée : plus personne n'est près de lui (un joueur près de sa nouvelle place y arrive). */
+    void oublierIle(UUID ile) {
+        pres.values().removeIf(mine -> mine.remove(ile) && mine.isEmpty());
+    }
+
     /** Départ ou changement de monde : son retour sera une arrivée. */
     void oublier(UUID joueur) {
         pres.remove(joueur);

@@ -8,49 +8,64 @@ import org.bukkit.plugin.Plugin;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 
 /**
  * Corps dessiné par BlockDisplayCreator : un « modèle montré pour un autre plugin », rien n'est écrit dans le monde.
  * Le regard est dans le fichier du modèle. Seule classe qui touche à BlockDisplayCreator, par réflexion : le plugin se
- * charge et tourne sans lui (softdepend). L'API est cherchée une fois par instance du moteur (à son activation, puis
- * de temps en temps) ; si elle manque, un avertissement (une fois) et Jake garde le corps de secours. Fil principal.
+ * charge et tourne sans lui (softdepend). L'API est cherchée une fois par instance du moteur et de son afficheur (à
+ * l'activation, à l'arrêt, puis de temps en temps) ; si elle manque, un avertissement (une fois) et Jake garde le
+ * corps de secours. Fil principal.
  */
 final class CorpsModele implements Corps {
-
-    /** Ce qu'a donné une demande de dessin. */
-    enum Resultat {
-        MONTRE,
-        /** Le moteur connaît le modèle mais ne l'a pas encore lu (demande faite dans une commande) : réessayer. */
-        PLUS_TARD,
-        /** Modèle inconnu du moteur, ou moteur absent : corps de secours. */
-        INCONNU
-    }
 
     private static final String MOTEUR = "BlockDisplayCreator";
     private static final String RENDERER = "me.general_breddok.blockdisplaycreator.render.DisplayRenderer";
     private static final String SHOWN = RENDERER + "$ShownModel";
 
+    /** Les méthodes de l'afficheur d'une instance du moteur ; « duration » et « animations » sont facultatives. */
+    record Api(Object moteur, Object renderer, Method show, Method hide, Method shows, Method play, Method stop,
+               Method knows, Method bounds, Method duration, Method animations) {
+
+        /** Cherche l'API sur ce plugin moteur ; lève une exception si une méthode obligatoire manque. */
+        static Api lire(Object moteur) throws ReflectiveOperationException {
+            ClassLoader loader = moteur.getClass().getClassLoader();
+            Class<?> r = Class.forName(RENDERER, true, loader);
+            Class<?> shown = Class.forName(SHOWN, true, loader);
+            Object renderer = moteur.getClass().getMethod("getDisplayRenderer").invoke(moteur);
+            if (renderer == null) {
+                throw new IllegalStateException("moteur d'affichage inactif");
+            }
+            return new Api(moteur, renderer,
+                    r.getMethod("show", Plugin.class, String.class, Location.class, float.class),
+                    r.getMethod("hide", shown), r.getMethod("shows", shown),
+                    r.getMethod("play", shown, String.class, Collection.class),
+                    r.getMethod("stop", shown, Collection.class),
+                    r.getMethod("knows", String.class), r.getMethod("bounds", String.class),
+                    facultative(r, "duration", String.class, String.class), facultative(r, "animations", String.class));
+        }
+
+        private static Method facultative(Class<?> r, String name, Class<?>... types) {
+            try {
+                return r.getMethod(name, types);
+            } catch (NoSuchMethodException e) {
+                return null;
+            }
+        }
+    }
+
     private final SHIslandJake plugin;
-    /** Instance du moteur pour laquelle l'API a été cherchée (trouvée ou non). */
-    private Plugin moteur;
-    private Object renderer;
-    private boolean disponible;
-    private Method show;
-    private Method hide;
-    private Method shows;
-    private Method play;
-    private Method stop;
-    private Method knows;
-    private Method bounds;
-    /** Facultative : durée d'une animation en ticks (modèle, animation). */
-    private Method duration;
+    private Api api;
+    /** Instance du moteur pour laquelle l'API a été cherchée sans succès (pas de nouvel essai pour elle). */
+    private Object echecPour;
     private boolean echecSignale;
-    /** Erreurs déjà écrites en console : une par méthode et par sorte d'erreur. */
-    private final Set<String> signalees = new HashSet<>();
+    /** Animations de chaque modèle, lues une fois (vidées quand le moteur change ou au rechargement). */
+    private final Map<String, Set<String>> animations = new HashMap<>();
+    private final Signalements signalements = new Signalements();
 
     CorpsModele(SHIslandJake plugin) {
         this.plugin = plugin;
@@ -58,69 +73,53 @@ final class CorpsModele implements Corps {
 
     /** Vrai si BlockDisplayCreator est là, actif, et expose l'API des modèles montrés. Lu dans un cache. */
     boolean disponible() {
-        return disponible;
+        return api != null;
     }
 
     /**
      * Relit l'état du moteur : à l'activation ou à l'arrêt d'un plugin, et de temps en temps (un « /bdc reload » peut
-     * rallumer son rendu). Renvoie vrai si la disponibilité a changé.
+     * refaire son afficheur). Renvoie vrai si quelque chose a changé : disponibilité, instance du moteur ou afficheur
+     * (les modèles montrés par l'ancienne ne valent plus rien).
      */
     boolean revoir() {
-        boolean avant = disponible;
         Plugin bdc = Bukkit.getPluginManager().getPlugin(MOTEUR);
+        Object avant = api == null ? null : api.renderer();
         if (bdc == null || !bdc.isEnabled()) {
-            moteur = null;
-            renderer = null;
-            disponible = false;
-        } else {
-            if (bdc != moteur || renderer == null) {
-                resoudre(bdc);
-            } else {
-                // même instance : son rendu a pu être refait (/bdc reload)
-                try {
-                    Object actuel = bdc.getClass().getMethod("getDisplayRenderer").invoke(bdc);
-                    if (actuel != renderer) {
-                        resoudre(bdc);
-                    }
-                } catch (ReflectiveOperationException | RuntimeException e) {
-                    resoudre(bdc);
-                }
+            api = null;
+            echecPour = null;
+        } else if (api == null || api.moteur() != bdc || afficheur(bdc) != api.renderer()) {
+            if (api == null && bdc == echecPour) {
+                return false;
             }
-            disponible = renderer != null;
+            resoudre(bdc);
         }
-        return avant != disponible;
+        Object apres = api == null ? null : api.renderer();
+        if (avant != apres) {
+            animations.clear();
+            return true;
+        }
+        return false;
     }
 
-    private void resoudre(Plugin bdc) {
-        moteur = bdc;
-        renderer = null;
+    private static Object afficheur(Object bdc) {
         try {
-            ClassLoader loader = bdc.getClass().getClassLoader();
-            Class<?> r = Class.forName(RENDERER, true, loader);
-            Class<?> shown = Class.forName(SHOWN, true, loader);
-            Object instance = bdc.getClass().getMethod("getDisplayRenderer").invoke(bdc);
-            if (instance == null) {
-                throw new IllegalStateException("moteur d'affichage inactif");
-            }
-            show = r.getMethod("show", Plugin.class, String.class, Location.class, float.class);
-            hide = r.getMethod("hide", shown);
-            shows = r.getMethod("shows", shown);
-            play = r.getMethod("play", shown, String.class, Collection.class);
-            stop = r.getMethod("stop", shown, Collection.class);
-            knows = r.getMethod("knows", String.class);
-            bounds = r.getMethod("bounds", String.class);
-            try {
-                duration = r.getMethod("duration", String.class, String.class);
-            } catch (NoSuchMethodException e) {
-                duration = null;
-            }
-            renderer = instance;
+            return bdc.getClass().getMethod("getDisplayRenderer").invoke(bdc);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private void resoudre(Object bdc) {
+        try {
+            api = Api.lire(bdc);
+            echecPour = null;
             if (echecSignale) {
                 plugin.getLogger().info("BlockDisplayCreator : modèles de Jake disponibles.");
             }
             echecSignale = false;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            renderer = null;
+            api = null;
+            echecPour = bdc;
             if (!echecSignale) {
                 echecSignale = true;
                 plugin.getLogger().warning("BlockDisplayCreator ne permet pas de montrer un modèle pour un autre plugin ("
@@ -131,7 +130,7 @@ final class CorpsModele implements Corps {
 
     /** Le modèle est-il connu du moteur ? */
     boolean connait(String modele) {
-        return disponible && Boolean.TRUE.equals(appel(knows, modele));
+        return api != null && Boolean.TRUE.equals(appel(api.knows(), modele));
     }
 
     /**
@@ -139,42 +138,71 @@ final class CorpsModele implements Corps {
      * inconnu ou pas encore lu par le moteur.
      */
     double[] bornes(String modele) {
-        if (!disponible) {
+        if (api == null) {
             return null;
         }
-        Object b = appel(bounds, modele);
+        Object b = appel(api.bounds(), modele);
         return b instanceof double[] d && d.length == 6 ? d : null;
     }
 
+    /**
+     * Le modèle a-t-il cette animation ? Vrai quand le moteur ne sait pas le dire (méthode absente) : le moteur
+     * répondra lui-même au moment de la jouer.
+     */
+    boolean aAnimation(String modele, String animation) {
+        if (api == null || api.animations() == null) {
+            return true;
+        }
+        Set<String> noms = animations.get(modele);
+        if (noms == null) {
+            Object lu = appel(api.animations(), modele);
+            noms = new java.util.HashSet<>();
+            if (lu instanceof Collection<?> c) {
+                for (Object o : c) {
+                    noms.add(String.valueOf(o));
+                }
+            }
+            // un modèle pas encore lu par le moteur n'est pas gardé : il sera relu
+            if (!noms.isEmpty()) {
+                animations.put(modele, noms);
+            }
+        }
+        return noms.isEmpty() || noms.contains(animation);
+    }
+
+    void oublierAnimations() {
+        animations.clear();
+    }
+
     /** Montre le modèle de l'apparence du Jake. */
-    Resultat essayer(Jake jake) {
+    EssaisModele.Resultat essayer(Jake jake) {
         if (jake.modele() != null) {
-            return Resultat.MONTRE;
+            return EssaisModele.Resultat.MONTRE;
         }
         Settings.Apparence a = plugin.settings().apparence(jake.data().type());
         Location where = jake.location();
-        if (!a.estModele() || where == null || !disponible) {
-            return Resultat.INCONNU;
+        if (!a.estModele() || where == null || api == null) {
+            return EssaisModele.Resultat.INCONNU;
         }
-        Object shown = appel(show, plugin, a.modele(), where, a.taille());
+        Object shown = appel(api.show(), plugin, a.modele(), where, a.taille());
         if (shown != null) {
             jake.setModele(shown);
-            return Resultat.MONTRE;
+            return EssaisModele.Resultat.MONTRE;
         }
-        return connait(a.modele()) ? Resultat.PLUS_TARD : Resultat.INCONNU;
+        return connait(a.modele()) ? EssaisModele.Resultat.PLUS_TARD : EssaisModele.Resultat.INCONNU;
     }
 
     @Override
     public boolean montrer(Jake jake) {
-        return essayer(jake) == Resultat.MONTRE;
+        return essayer(jake) == EssaisModele.Resultat.MONTRE;
     }
 
     @Override
     public void retirer(Jake jake) {
         Object shown = jake.modele();
         jake.setModele(null);
-        if (shown != null && disponible) {
-            appel(hide, shown);
+        if (shown != null && api != null) {
+            appel(api.hide(), shown);
         }
     }
 
@@ -186,43 +214,44 @@ final class CorpsModele implements Corps {
     @Override
     public boolean jouer(Jake jake, String animation, Player pour) {
         Object shown = jake.modele();
-        if (shown == null || animation == null || animation.isEmpty() || !disponible) {
+        if (shown == null || animation == null || animation.isEmpty() || api == null) {
             return false;
         }
-        Object result = appel(play, shown, animation, List.of(pour));
+        Object result = appel(api.play(), shown, animation, List.of(pour));
         return result instanceof Enum<?> e && e.name().equals("PLAYED");
     }
 
     @Override
     public void arreter(Jake jake, Player pour) {
         Object shown = jake.modele();
-        if (shown != null && disponible) {
-            appel(stop, shown, List.of(pour));
+        if (shown != null && api != null) {
+            appel(api.stop(), shown, List.of(pour));
         }
     }
 
+    /** Durée donnée par le moteur pour le modèle réellement dessiné ; -1 s'il ne sait pas la dire. */
     @Override
     public int duree(Jake jake, String animation) {
-        Object shown = jake.modele();
-        if (shown == null || duration == null || !disponible) {
+        Settings.Apparence a = jake.dessinee();
+        if (jake.modele() == null || a == null || !a.estModele() || api == null || api.duration() == null) {
             return -1;
         }
-        Object d = appel(duration, plugin.settings().apparence(jake.data().type()).modele(), animation);
+        Object d = appel(api.duration(), a.modele(), animation);
         return d instanceof Number n && n.intValue() > 0 ? n.intValue() : -1;
     }
 
     @Override
     public boolean vivant(Jake jake) {
         Object shown = jake.modele();
-        return shown != null && disponible && Boolean.TRUE.equals(appel(shows, shown));
+        return shown != null && api != null && Boolean.TRUE.equals(appel(api.shows(), shown));
     }
 
     private Object appel(Method method, Object... args) {
         try {
-            return method.invoke(renderer, args);
+            return method.invoke(api.renderer(), args);
         } catch (InvocationTargetException | IllegalAccessException | RuntimeException e) {
             Throwable cause = e instanceof InvocationTargetException ite && ite.getCause() != null ? ite.getCause() : e;
-            if (signalees.add(method.getName() + "/" + cause.getClass().getName())) {
+            if (signalements.premiere("moteur/" + method.getName(), cause)) {
                 plugin.getLogger().log(Level.WARNING, "BlockDisplayCreator : " + method.getName() + " a échoué", cause);
             }
             return null;

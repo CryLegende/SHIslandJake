@@ -144,8 +144,8 @@ public final class Settings {
     public final int ambiancePauseMinTicks;
     public final int ambiancePauseMaxTicks;
     public final int defaultAnimationTicks;
-    /** Durée d'une animation (ambiance.durees), en ticks. */
-    public final Map<String, Integer> animationTicks;
+    /** Durée de chaque animation de chaque modèle (ambiance.durees.<modèle>.<animation>), en ticks. */
+    public final Map<String, Map<String, Integer>> animationTicks;
 
     public final ReglagesReactions reactions;
 
@@ -222,11 +222,20 @@ public final class Settings {
         ambiancePauseMinTicks = (int) Math.round(Math.max(0, c.getDouble("ambiance.pause-min-secondes", 15)) * 20);
         ambiancePauseMaxTicks = (int) Math.round(Math.max(0, c.getDouble("ambiance.pause-max-secondes", 30)) * 20);
         defaultAnimationTicks = (int) Math.max(1, Math.round(c.getDouble("ambiance.duree-defaut-secondes", 8) * 20));
-        Map<String, Integer> durees = new HashMap<>();
+        Map<String, Map<String, Integer>> durees = new HashMap<>();
         ConfigurationSection d = c.getConfigurationSection("ambiance.durees");
         if (d != null) {
-            for (String anim : d.getKeys(false)) {
-                durees.put(anim, (int) Math.max(1, Math.round(d.getDouble(anim) * 20)));
+            for (String model : d.getKeys(false)) {
+                ConfigurationSection m = d.getConfigurationSection(model);
+                if (m == null) {
+                    log.warning("ambiance.durees." + model + " : une durée se donne par modèle (ambiance.durees.<modèle>.<animation>), ignorée.");
+                    continue;
+                }
+                Map<String, Integer> parAnimation = new HashMap<>();
+                for (String anim : m.getKeys(false)) {
+                    parAnimation.put(anim, (int) Math.max(1, Math.round(m.getDouble(anim) * 20)));
+                }
+                durees.put(model, Map.copyOf(parAnimation));
             }
         }
         animationTicks = Map.copyOf(durees);
@@ -337,10 +346,16 @@ public final class Settings {
         }
     }
 
-    /** Durée d'une animation selon la configuration (ambiance.durees, sinon duree-defaut-secondes), en ticks. */
-    public int animationTicks(String animation) {
-        Integer t = animationTicks.get(animation);
+    /** Durée d'une animation d'un modèle selon la configuration (ambiance.durees, sinon duree-defaut-secondes), en ticks. */
+    public int animationTicks(String modele, String animation) {
+        Map<String, Integer> m = animationTicks.get(modele);
+        Integer t = m == null ? null : m.get(animation);
         return t == null ? defaultAnimationTicks : t;
+    }
+
+    /** Un identifiant remplacé (apparences.remplacements) n'est plus proposé ni accepté. */
+    public boolean remplacee(String id) {
+        return remplacements.table().containsKey(Remplacements.id(id));
     }
 
     /** Apparence de cet identifiant ; une apparence inconnue (retirée de la configuration) prend celle de jake.type. */

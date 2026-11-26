@@ -41,6 +41,7 @@ final class Reactions {
     private final Attentes<Demande> attentes = new Attentes<>();
     private final Ambiance ambiance = new Ambiance(new Random());
     private final Map<String, Particle> particules = new HashMap<>();
+    private final Signalements erreurs = new Signalements();
 
     Reactions(SHIslandJake plugin) {
         this.plugin = plugin;
@@ -69,7 +70,7 @@ final class Reactions {
                 }
             }
         } catch (RuntimeException e) {
-            plugin.getLogger().log(Level.WARNING, "Réaction d'arrivée pour " + player.getName() + " impossible", e);
+            signaler("arrivee", "Réaction d'arrivée pour " + player.getName() + " impossible", e);
         } finally {
             plugin.mesures().fin(Mesures.Tache.REACTIONS, start);
         }
@@ -105,7 +106,7 @@ final class Reactions {
             }
             return true;
         } catch (RuntimeException e) {
-            plugin.getLogger().log(Level.WARNING, "Réaction « " + nom + " » pour " + player.getName() + " impossible", e);
+            signaler("commande", "Réaction « " + nom + " » pour " + player.getName() + " impossible", e);
             return true;
         } finally {
             plugin.mesures().fin(Mesures.Tache.REACTIONS, start);
@@ -166,7 +167,7 @@ final class Reactions {
                 try {
                     rejouer(player, demande);
                 } catch (RuntimeException e) {
-                    plugin.getLogger().log(Level.WARNING, "Réaction en attente pour " + player.getName() + " impossible", e);
+                    signaler("attente", "Réaction en attente pour " + player.getName() + " impossible", e);
                 } finally {
                     plugin.mesures().fin(Mesures.Tache.REACTIONS, start);
                 }
@@ -190,6 +191,23 @@ final class Reactions {
         // le joueur a pu changer de Jake pendant son menu : la réaction doit être pour lui sur celui-ci
         if (r != null && r.pour().accepte(proche.vue().membre)) {
             jouer(player, proche.jake(), proche.vue(), r, demande.texte());
+        }
+    }
+
+    /**
+     * Clic d'un membre sur Jake : le geste « clic » du modèle pour lui seul (s'il existe). C'est une réaction pour
+     * l'ambiance : aucune scène ne le coupe, et il remplace la scène en cours.
+     */
+    void clic(Player player, Jake jake) {
+        Settings s = plugin.settings();
+        UUID id = player.getUniqueId();
+        if (plugin.discret().est(id) || s.clickAnimation.isEmpty()) {
+            return;
+        }
+        int tick = Bukkit.getCurrentTick();
+        if (plugin.display().jouer(jake, s.clickAnimation, player)) {
+            ambiance.reaction(id, tick, plugin.display().duree(jake, s.clickAnimation),
+                    ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks));
         }
     }
 
@@ -323,13 +341,18 @@ final class Reactions {
         if (choisi == null) {
             return;
         }
+        Jake jake = choisi;
+        List<String> scenes = apparence(choisi).scenes().stream().filter(sc -> plugin.display().animationConnue(jake, sc)).toList();
+        if (scenes.isEmpty()) {
+            return;
+        }
         JakeData d = choisi.data();
         double yeux = ici.getY() + player.getEyeHeight();
         if (!Ambiance.devant(ici.getX(), yeux, ici.getZ(), ici.getYaw(), ici.getPitch(),
                 d.x(), d.y() + choisi.hauteurTexte() * 0.5, d.z(), s.ambianceCosine)) {
             return;
         }
-        String scene = ambiance.tirer(id, apparence(choisi).scenes());
+        String scene = ambiance.tirer(id, scenes);
         int pause = ambiance.pause(s.ambiancePauseMinTicks, s.ambiancePauseMaxTicks);
         if (scene != null && plugin.display().jouer(choisi, scene, player)) {
             ambiance.scene(id, scene, tick, plugin.display().duree(choisi, scene), pause);
@@ -340,6 +363,13 @@ final class Reactions {
     }
 
     //OUTILS----------
+
+    /** Une même erreur n'est écrite qu'une fois en console. */
+    private void signaler(String contexte, String message, RuntimeException e) {
+        if (erreurs.premiere(contexte, e)) {
+            plugin.getLogger().log(Level.WARNING, message, e);
+        }
+    }
 
     /** Lit les placeholders d'un texte pour ce joueur ; un même texte n'est lu qu'une fois par évaluation. */
     private UnaryOperator<String> lecteur(Player player) {

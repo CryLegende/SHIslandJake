@@ -170,9 +170,7 @@ final class JakeListener implements Listener {
             return;
         }
         // le geste du clic (s'il existe) pour ce joueur seul ; la commande part tout de suite
-        if (!plugin.discret().est(player.getUniqueId())) {
-            plugin.display().jouer(jake, settings.clickAnimation, player);
-        }
+        plugin.reactions().clic(player, jake);
         if (!settings.clickCommand.isEmpty()) {
             plugin.sound(player, settings.soundClick);
             player.performCommand(settings.clickCommand);

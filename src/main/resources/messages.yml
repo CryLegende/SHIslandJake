@@ -34,6 +34,8 @@ chat:
   # Apparence pas encore obtenue (avec apparences.permission-usage).
   type-non-obtenue: '&7&l« &c&lSH &8&l» &7Vous n''avez pas encore obtenu l''apparence &c{type}&7.'
   type-inconnu: '&7&l« &c&lSH &8&l» &7Il n''existe pas d''apparence &c{type}&7.'
+  # Apparence remplacée par une autre (config.yml, apparences.remplacements) : elle n'est plus proposée.
+  type-remplace: '&7&l« &c&lSH &8&l» &7L''apparence &c{type} &7n''est plus proposée.'
   sans-permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la &cpermission &7d''utiliser cette commande.'
   joueurs-seulement: '&7&l« &c&lSH &8&l» &7Cette commande se lance &cen jeu&7.'
   # {commandes} = sous-commandes permises, séparées par « | ».

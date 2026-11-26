@@ -86,6 +86,9 @@ final class JakeMenu implements InventoryHolder {
         List<String> typeLines = new ArrayList<>();
         boolean otherAllowed = false;
         for (Settings.Apparence type : s.types.values()) {
+            if (s.remplacee(type.id())) {
+                continue;
+            }
             boolean current = type.id().equals(d.type());
             typeLines.add(m.text(current ? "menu.principal.type.ligne-actuel" : "menu.principal.type.ligne",
                     "type", m.typeName(type.id())));
@@ -136,6 +139,9 @@ final class JakeMenu implements InventoryHolder {
         List<Integer> slots = s.typesSlots;
         int index = 0;
         for (Settings.Apparence type : s.types.values()) {
+            if (s.remplacee(type.id())) {
+                continue;
+            }
             if (index >= slots.size()) {
                 plugin.getLogger().warning("menu.types.cases : pas assez de cases pour toutes les apparences.");
                 break;

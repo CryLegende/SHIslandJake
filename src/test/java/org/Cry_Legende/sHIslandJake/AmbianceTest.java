@@ -65,4 +65,18 @@ class AmbianceTest {
         assertFalse(a.libre(j, 400), "pause après la réaction");
         assertTrue(a.libre(j, 460));
     }
+
+    @Test
+    void leGesteDuClicPasseDevantLaScene() {
+        // le clic est déclaré comme une réaction : aucune scène ne le coupe au passage suivant
+        Ambiance a = new Ambiance(new Random(2));
+        UUID j = UUID.randomUUID();
+        a.scene(j, "carte", 0, 160, 300);
+        a.reaction(j, 20, 34, 300);
+        assertFalse(a.enScene(j, 21), "une réaction suivante ne croit plus à une scène en cours");
+        assertFalse(a.libre(j, 30), "pas de scène pendant le geste du clic");
+        // la pause la plus longue des deux (scène coupée, geste) est gardée
+        assertFalse(a.libre(j, 459));
+        assertTrue(a.libre(j, 460));
+    }
 }

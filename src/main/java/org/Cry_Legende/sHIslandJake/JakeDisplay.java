@@ -12,22 +12,19 @@ import java.util.UUID;
 /**
  * Choisit le corps de chaque Jake : le modèle de son apparence (BlockDisplayCreator) quand le moteur le connaît, sinon
  * le corps de secours (FancyNpcs, apparence « apparences.secours ») ; jamais d'île sans Jake. Un modèle que le moteur
- * connaît mais n'a pas encore lu (demandé depuis une commande) est redemandé au tick suivant, pas remplacé par le
- * secours ; un Jake resté en secours réessaie son modèle de temps en temps. Un avertissement par apparence dont le
- * modèle manque, une fois. Fil principal.
+ * connaît mais n'a pas encore lu est redemandé au tick suivant ({@link EssaisModele}) ; un Jake resté en secours
+ * réessaie son modèle de temps en temps, et ne quitte le villageois que si le modèle s'est montré. Un avertissement par
+ * apparence dont le modèle manque, et par scène absente d'un modèle, une fois. Fil principal.
  */
 final class JakeDisplay {
-
-    /** Demandes sans réponse du moteur avant de prendre le corps de secours (il réessaiera le modèle plus tard). */
-    private static final int PLUS_TARD_MAX = 20;
 
     private final SHIslandJake plugin;
     private final JakeRegistry registry;
     private final CorpsMob mob;
     private final CorpsModele modele;
     private final Textes textes;
-    /** Apparences déjà signalées en console (modèle introuvable). */
-    private final Set<String> signalees = new HashSet<>();
+    /** Avertissements déjà écrits (apparence sans modèle, scène absente d'un modèle). */
+    private final Set<String> signales = new HashSet<>();
     private JakeTracker tracker;
 
     JakeDisplay(SHIslandJake plugin, JakeRegistry registry, Textes textes) {
@@ -76,15 +73,11 @@ final class JakeDisplay {
             // lâché par le moteur (chunk déchargé, fichier retiré...) : tout est refait
             release(jake);
         } else if (corps != null) {
-            boolean reessai = false;
-            if (jake.secours() && tick >= jake.prochainEssaiModele) {
-                // resté en secours : le modèle est-il revenu ?
-                jake.prochainEssaiModele = tick + s.modelRetryTicks;
-                Settings.Apparence voulue = s.apparence(jake.data().type());
-                reessai = voulue.estModele() && modele.disponible() && modele.connait(voulue.modele());
-            }
-            if (!reessai && corps.vivant(jake)) {
+            if (corps.vivant(jake)) {
                 jake.verifie = tick;
+                if (jake.secours() && tick >= jake.prochainEssaiModele) {
+                    essayerDepuisSecours(jake, tick);
+                }
                 return true;
             }
             release(jake);
@@ -97,31 +90,31 @@ final class JakeDisplay {
         numeroter(jake);
         Settings.Apparence a = s.apparence(jake.data().type());
         if (a.estModele()) {
-            CorpsModele.Resultat r = modele.disponible() ? modele.essayer(jake) : CorpsModele.Resultat.INCONNU;
-            if (r == CorpsModele.Resultat.MONTRE) {
-                jake.essaisPlusTard = 0;
-                jake.dessine(modele, a, s.defaultHeight, (float) Math.min(s.maxZoneWidth, s.defaultZoneWidth), (float) s.defaultZoneHeight);
-                jake.setBornesProvisoires(true);
-                bornes(jake);
-                jake.prochainControle = tick + s.modelCheckTicks;
-                registry.markDrawn(jake, true);
-                return true;
+            EssaisModele.Resultat r = modele.disponible() ? modele.essayer(jake) : EssaisModele.Resultat.INCONNU;
+            switch (EssaisModele.suite(r, jake.essaisPlusTard)) {
+                case MONTRE -> {
+                    modeleMontre(jake, a, tick);
+                    return true;
+                }
+                case RELANCER -> {
+                    jake.essaisPlusTard++;
+                    relancer(jake, tick);
+                    return false;
+                }
+                default -> {
+                    jake.essaisPlusTard = 0;
+                    signaler(a, r);
+                    Settings.Apparence secours = s.secours;
+                    if (mob.montrer(jake, secours)) {
+                        jake.dessine(mob, secours, Double.isNaN(secours.hauteur()) ? s.defaultHeight : secours.hauteur(), 0f, 0f);
+                        jake.setSecours(true);
+                        jake.prochainEssaiModele = tick + s.modelRetryTicks;
+                        registry.markDrawn(jake, true);
+                        return true;
+                    }
+                    return false;
+                }
             }
-            if (r == CorpsModele.Resultat.PLUS_TARD && ++jake.essaisPlusTard <= PLUS_TARD_MAX) {
-                relancer(jake, tick);
-                return false;
-            }
-            jake.essaisPlusTard = 0;
-            signaler(a, r);
-            Settings.Apparence secours = s.secours;
-            if (mob.montrer(jake, secours)) {
-                jake.dessine(mob, secours, Double.isNaN(secours.hauteur()) ? s.defaultHeight : secours.hauteur(), 0f, 0f);
-                jake.setSecours(true);
-                jake.prochainEssaiModele = tick + s.modelRetryTicks;
-                registry.markDrawn(jake, true);
-                return true;
-            }
-            return false;
         }
         if (mob.montrer(jake, a)) {
             jake.dessine(mob, a, Double.isNaN(a.hauteur()) ? s.defaultHeight : a.hauteur(), 0f, 0f);
@@ -129,6 +122,52 @@ final class JakeDisplay {
             return true;
         }
         return false;
+    }
+
+    /** Le modèle est montré : hauteur et zone par défaut, corrigées dès que le moteur donne son dessin. */
+    private void modeleMontre(Jake jake, Settings.Apparence a, int tick) {
+        Settings s = plugin.settings();
+        jake.essaisPlusTard = 0;
+        jake.dessine(modele, a, s.defaultHeight, (float) Math.min(s.maxZoneWidth, s.defaultZoneWidth), (float) s.defaultZoneHeight);
+        jake.setSecours(false);
+        jake.setBornesProvisoires(true);
+        bornes(jake);
+        jake.prochainControle = tick + s.modelCheckTicks;
+        registry.markDrawn(jake, true);
+    }
+
+    /**
+     * Resté en secours : le modèle est-il revenu ? Il est demandé pendant que le villageois est encore là ; le
+     * villageois ne part que si le modèle s'est montré (Jake ne disparaît jamais le temps d'un essai).
+     */
+    private void essayerDepuisSecours(Jake jake, int tick) {
+        Settings s = plugin.settings();
+        Settings.Apparence voulue = s.apparence(jake.data().type());
+        if (!voulue.estModele() || !modele.disponible()) {
+            jake.prochainEssaiModele = tick + s.modelRetryTicks;
+            return;
+        }
+        EssaisModele.Resultat r = modele.essayer(jake);
+        switch (EssaisModele.suite(r, jake.essaisPlusTard)) {
+            case MONTRE -> {
+                // le villageois part, les textes et la zone sont renvoyés à la hauteur du modèle
+                mob.retirer(jake);
+                if (tracker != null) {
+                    tracker.forgetJake(jake);
+                }
+                textes.oublierJake(jake);
+                modeleMontre(jake, voulue, tick);
+            }
+            case RELANCER -> {
+                jake.essaisPlusTard++;
+                jake.prochainEssaiModele = tick + 1;
+                relancer(jake, tick);
+            }
+            default -> {
+                jake.essaisPlusTard = 0;
+                jake.prochainEssaiModele = tick + s.modelRetryTicks;
+            }
+        }
     }
 
     /** Le moteur lit le modèle : les joueurs autour du Jake sont repassés au tick suivant, une fois. */
@@ -174,7 +213,6 @@ final class JakeDisplay {
             // textes et zone renvoyés à la bonne hauteur ; le corps reste
             tracker.forgetJake(jake);
             textes.oublierJake(jake);
-            registry.changed();
         }
     }
 
@@ -186,16 +224,32 @@ final class JakeDisplay {
         }
     }
 
-    private void signaler(Settings.Apparence a, CorpsModele.Resultat r) {
-        if (!signalees.add(a.id())) {
+    private void signaler(Settings.Apparence a, EssaisModele.Resultat r) {
+        if (!signales.add("apparence/" + a.id())) {
             return;
         }
         String raison = !modele.disponible() ? "BlockDisplayCreator absent ou sans modèles pour les autres plugins"
-                : r == CorpsModele.Resultat.PLUS_TARD ? "le moteur ne montre toujours pas le modèle « " + a.modele() + " »"
+                : r == EssaisModele.Resultat.PLUS_TARD ? "le moteur ne montre toujours pas le modèle « " + a.modele() + " »"
                 : "modèle « " + a.modele() + " » inconnu de BlockDisplayCreator";
         plugin.getLogger().warning("Apparence " + a.id() + " : " + raison + ". Jake est dessiné en "
                 + plugin.settings().secours.id() + " à la place (nouvel essai toutes les "
                 + plugin.settings().modelRetryTicks / 20 + " s).");
+    }
+
+    /**
+     * Le modèle du Jake a-t-il cette animation ? Sinon un avertissement, une fois par modèle et par animation (une
+     * scène écrite dans « types » mais absente du fichier du modèle).
+     */
+    boolean animationConnue(Jake jake, String animation) {
+        Settings.Apparence a = jake.dessinee();
+        if (jake.corps() != modele || a == null || modele.aAnimation(a.modele(), animation)) {
+            return true;
+        }
+        if (signales.add("animation/" + a.modele() + "/" + animation)) {
+            plugin.getLogger().warning("Apparence " + a.id() + " : l'animation « " + animation + " » n'existe pas dans le modèle « "
+                    + a.modele() + " » (types." + a.id() + ".scenes).");
+        }
+        return false;
     }
 
     /** Ce joueur le voit ou plus (corps de secours ; le moteur des modèles gère seul ses spectateurs). */
@@ -220,13 +274,17 @@ final class JakeDisplay {
     }
 
     /**
-     * Durée d'une animation en ticks : celle que donne le moteur (s'il sait la dire), sinon ambiance.durees, sinon
-     * ambiance.duree-defaut-secondes.
+     * Durée d'une animation en ticks : celle que donne le moteur (s'il sait la dire), sinon ambiance.durees du modèle,
+     * sinon ambiance.duree-defaut-secondes.
      */
     int duree(Jake jake, String animation) {
         Corps corps = jake.corps();
         int d = corps == null ? -1 : corps.duree(jake, animation);
-        return d > 0 ? d : plugin.settings().animationTicks(animation);
+        if (d > 0) {
+            return d;
+        }
+        Settings.Apparence a = jake.dessinee();
+        return plugin.settings().animationTicks(a == null ? "" : a.modele(), animation);
     }
 
     /** Le Jake est-il dessiné par un modèle ? */
@@ -259,10 +317,11 @@ final class JakeDisplay {
         for (Jake jake : new ArrayList<>(registry.drawn())) {
             release(jake);
         }
-        signalees.clear();
+        signales.clear();
+        modele.oublierAnimations();
     }
 
-    /** Le moteur est arrivé, reparti, ou son rendu a changé : tous les Jake sont redessinés avec le corps qui convient. */
+    /** Le moteur est arrivé, reparti, ou son instance ou son afficheur a changé : tous les Jake sont redessinés. */
     void moteurChange() {
         if (modele.revoir()) {
             releaseAll();

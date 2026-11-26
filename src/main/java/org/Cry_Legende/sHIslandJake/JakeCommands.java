@@ -170,6 +170,11 @@ final class JakeCommands {
     /** Vrai si l'apparence a changé. Les droits sont vérifiés ici, au moment du choix. */
     boolean changeType(Player player, Jake jake, Settings.Apparence type) {
         String typeName = plugin.messages().typeName(type.id());
+        if (plugin.settings().remplacee(type.id())) {
+            plugin.sound(player, plugin.settings().soundRefusal);
+            plugin.messages().send(player, "type-remplace", "type", typeName);
+            return false;
+        }
         if (jake.data().type().equals(type.id())) {
             plugin.messages().send(player, "type-deja", "type", typeName);
             return false;
@@ -271,7 +276,7 @@ final class JakeCommands {
         } else if (args.length == 2 && TYPE.contains(args[0].toLowerCase(Locale.ROOT))
                 && sender.hasPermission("shislandjake.use")) {
             for (Settings.Apparence type : plugin.settings().types.values()) {
-                if (plugin.settings().etat(sender, type) == Settings.Etat.DISPONIBLE) {
+                if (!plugin.settings().remplacee(type.id()) && plugin.settings().etat(sender, type) == Settings.Etat.DISPONIBLE) {
                     options.add(type.id().toLowerCase(Locale.ROOT));
                 }
             }

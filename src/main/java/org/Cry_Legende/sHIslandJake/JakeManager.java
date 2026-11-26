@@ -88,6 +88,7 @@ final class JakeManager {
 
     void move(Jake jake, Location target, float yaw) {
         display.release(jake);
+        tracker.oublierIle(jake.island());
         registry.update(jake, jake.data().withPosition(target.getWorld().getName(), target.getX(), target.getY(),
                 target.getZ(), yaw, 0f));
         store.markDirty();
@@ -119,6 +120,9 @@ final class JakeManager {
         display.release(jake);
         registry.remove(jake);
         store.markDirty();
+        if (tracker != null) {
+            tracker.oublierIle(island);
+        }
     }
 
     /**

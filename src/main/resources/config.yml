@@ -310,7 +310,9 @@ ambiance:
   angle-vue: 70
   pause-min-secondes: 15
   pause-max-secondes: 30
-  # Durée d'une animation (scène ou réaction) quand le moteur ne la donne pas : « durees », sinon celle-ci.
+  # Durée d'une animation (scène ou réaction) quand le moteur ne la donne pas : « durees.<modèle>.<animation> » en
+  # secondes (deux modèles peuvent avoir une animation du même nom), sinon celle-ci. Une scène absente du fichier du
+  # modèle est signalée en console, une fois, et n'est pas jouée.
   duree-defaut-secondes: 8
   durees:
 

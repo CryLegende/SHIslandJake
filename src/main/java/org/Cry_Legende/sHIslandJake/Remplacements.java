@@ -42,6 +42,20 @@ final class Remplacements {
         return found == null ? type : found;
     }
 
+    /** Les données lues, apparences remplacées ; « changes » reçoit le nombre de Jake changés. */
+    java.util.List<JakeData> appliquer(java.util.List<JakeData> lus, int[] changes) {
+        java.util.List<JakeData> out = new java.util.ArrayList<>(lus.size());
+        for (JakeData d : lus) {
+            String type = appliquer(d.type());
+            if (!type.equals(d.type())) {
+                d = d.withType(type);
+                changes[0]++;
+            }
+            out.add(d);
+        }
+        return out;
+    }
+
     boolean vide() {
         return table.isEmpty();
     }

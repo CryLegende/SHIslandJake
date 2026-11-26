@@ -72,14 +72,11 @@ public final class SHIslandJake extends JavaPlugin {
         long start = System.nanoTime();
         int replaced = 0;
         try {
-            for (JakeData data : store.load().jakes()) {
-                String type = settings.remplacements.appliquer(data.type());
-                if (!type.equals(data.type())) {
-                    data = data.withType(type);
-                    replaced++;
-                }
+            int[] changes = new int[1];
+            for (JakeData data : settings.remplacements.appliquer(store.load().jakes(), changes)) {
                 registry.add(new Jake(data));
             }
+            replaced = changes[0];
             loadMillis = (System.nanoTime() - start) / 1_000_000;
         } catch (IOException | InvalidConfigurationException e) {
             // Mieux vaut ne rien dessiner que réécrire le fichier sans les Jake qu'on n'a pas su lire

@@ -69,9 +69,18 @@ class JakeStoreTest {
     @Test
     void remplacementsAuChargement(@TempDir Path dossier) throws Exception {
         Files.writeString(dossier.resolve("jakes.yml"), FICHIER_141, StandardCharsets.UTF_8);
-        Remplacements r = new Remplacements(java.util.Map.of("VILLAGER", "AVENTURIER"));
-        List<JakeData> lus = new JakeStore(dossier.toFile(), Logger.getLogger("essai")).load().jakes();
-        List<String> types = lus.stream().map(d -> r.appliquer(d.type())).toList();
-        assertEquals(List.of("AVENTURIER", "WITCH", "ZOMBIE_HORSE"), types);
+        Remplacements r = new Remplacements(java.util.Map.of("VILLAGER", "AVENTURIER", "WITCH", "SORCIERE"));
+        int[] changes = new int[1];
+        // le chemin du démarrage : jakes.yml lu, puis la table appliquée à chaque Jake
+        List<JakeData> lus = r.appliquer(new JakeStore(dossier.toFile(), Logger.getLogger("essai")).load().jakes(), changes);
+        assertEquals(2, changes[0]);
+        assertEquals(List.of("AVENTURIER", "SORCIERE", "ZOMBIE_HORSE"), lus.stream().map(JakeData::type).toList());
+        // le reste des données ne bouge pas
+        assertFalse(lus.get(1).visible());
+        assertEquals(-1196.5, lus.get(1).x());
+        // une table vide ne change rien
+        int[] aucun = new int[1];
+        new Remplacements(java.util.Map.of()).appliquer(lus, aucun);
+        assertEquals(0, aucun[0]);
     }
 }

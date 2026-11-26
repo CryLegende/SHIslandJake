@@ -66,16 +66,6 @@ final class JakeTracker {
         }
     }
 
-    /** Où était un joueur au dernier passage complet, et quand il en faudra un autre même s'il ne bouge pas. */
-    private static final class Etat {
-        World world;
-        double x;
-        double y;
-        double z;
-        int changes = -1;
-        int prochainComplet;
-    }
-
     private final SHIslandJake plugin;
     private final JakeRegistry registry;
     private final JakeDisplay display;
@@ -83,12 +73,12 @@ final class JakeTracker {
     private final Arrivees arrivees = new Arrivees();
     private final Map<UUID, Map<Jake, Textes.Vue>> vues = new HashMap<>();
     private final Map<UUID, Map<Jake, Look>> looks = new HashMap<>();
-    private final Map<UUID, Etat> etats = new HashMap<>();
+    private final Map<UUID, Raccourci> etats = new HashMap<>();
     private final Set<UUID> joining = new HashSet<>();
     /** Liste réutilisée d'un passage à l'autre (fil principal, jamais deux passages à la fois). */
     private final List<Jake> nearBuffer = new ArrayList<>();
     private final Location ici = new Location(null, 0, 0, 0);
-    private final Set<String> erreurs = new HashSet<>();
+    private final Signalements erreurs = new Signalements();
     private BukkitTask visibilityTask;
     private BukkitTask lookTask;
     private BukkitTask forgetTask;
@@ -218,11 +208,21 @@ final class JakeTracker {
         }
     }
 
-    /** Ce Jake n'est plus dessiné : ce que les joueurs en ont reçu est retiré (il sera renvoyé s'il revient). */
+    /**
+     * Ce Jake n'est plus dessiné (ou l'est autrement) : ce que les joueurs en ont reçu est retiré, et leur prochain
+     * passage est complet (il leur sera renvoyé). Les autres joueurs gardent leur raccourci.
+     */
     void forgetJake(Jake jake) {
         for (Map.Entry<UUID, Map<Jake, Textes.Vue>> entry : vues.entrySet()) {
             Textes.Vue vue = entry.getValue().remove(jake);
-            Player player = vue == null ? null : Bukkit.getPlayer(entry.getKey());
+            if (vue == null) {
+                continue;
+            }
+            Raccourci r = etats.get(entry.getKey());
+            if (r != null) {
+                r.salir();
+            }
+            Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
                 Paquets.Envoi envoi = Paquets.envoi(player);
                 textes.cacher(envoi, player, jake, vue);
@@ -233,6 +233,11 @@ final class JakeTracker {
         for (Map<Jake, Look> mine : looks.values()) {
             mine.remove(jake);
         }
+    }
+
+    /** Jake déplacé ou île supprimée : l'état « près » de cette île est oublié pour tous. */
+    void oublierIle(UUID island) {
+        arrivees.oublierIle(island);
     }
 
     /** Jake que ce joueur voit en ce moment, avec ce qu'il en a reçu ; null s'il n'en voit aucun. */
@@ -252,7 +257,7 @@ final class JakeTracker {
                 refresh(player, false);
             } catch (RuntimeException e) {
                 // un joueur qui pose problème n'empêche pas le passage des suivants
-                if (erreurs.add(e.getClass().getName() + e.getStackTrace()[0])) {
+                if (erreurs.premiere("suivi", e)) {
                     plugin.getLogger().log(Level.WARNING, "Suivi de " + player.getName() + " impossible", e);
                 }
             }
@@ -269,12 +274,12 @@ final class JakeTracker {
         player.getLocation(ici);
         World world = ici.getWorld();
         int tick = Bukkit.getCurrentTick();
-        Etat etat = etats.get(id);
+        Raccourci etat = etats.computeIfAbsent(id, k -> new Raccourci());
         Map<Jake, Textes.Vue> mine = vues.get(id);
-        if (!force && etat != null && etat.world == world && etat.changes == registry.changes() && tick < etat.prochainComplet
-                && square(ici.getX() - etat.x) + square(ici.getY() - etat.y) + square(ici.getZ() - etat.z) < settings.moveThresholdSquared) {
-            // rien n'a bougé : seule l'ambiance (le joueur a pu tourner la tête vers Jake)
+        if (!force && etat.saute(world, ici.getX(), ici.getY(), ici.getZ(), tick, settings.moveThresholdSquared)) {
+            // rien n'a bougé : alerte et appartenance relues à leur rythme, et l'ambiance (il a pu tourner la tête)
             if (mine != null) {
+                leger(player, mine, etat, tick);
                 plugin.reactions().ambiance(player, mine, ici);
             }
             return;
@@ -282,7 +287,9 @@ final class JakeTracker {
         List<Jake> near = nearBuffer;
         registry.near(world.getName(), ici.getBlockX(), ici.getBlockZ(), settings.viewDistance, near);
         if (near.isEmpty() && mine == null) {
-            remember(id, etat, world, tick + settings.fullPassTicks);
+            etat.complet(world, ici.getX(), ici.getY(), ici.getZ(), tick + settings.fullPassTicks);
+            etat.alerteA = Integer.MAX_VALUE;
+            etat.membreA = Integer.MAX_VALUE;
             arrivees.finPassage(id);
             return;
         }
@@ -293,6 +300,8 @@ final class JakeTracker {
         double enter = square(settings.reactions.distance);
         double leave = square(settings.reactions.distance + HYSTERESIS);
         int prochain = tick + settings.fullPassTicks;
+        int membreA = Integer.MAX_VALUE;
+        boolean manque = false;
         Map<Jake, Look> myLooks = looks.get(id);
         if (myLooks != null) {
             myLooks.values().forEach(look -> look.near = false);
@@ -307,7 +316,12 @@ final class JakeTracker {
             }
             double distance = square(ici.getX() - d.x()) + square(ici.getY() - d.y()) + square(ici.getZ() - d.z());
             Textes.Vue vue = mine == null ? null : mine.get(jake);
-            if (distance > range || !display.montrer(jake, vue == null)) {
+            if (distance > range) {
+                continue;
+            }
+            if (!display.montrer(jake, vue == null)) {
+                // chunk pas encore chargé, modèle en lecture : nouvel essai au prochain passage
+                manque = true;
                 continue;
             }
             jake.seen(now);
@@ -327,7 +341,7 @@ final class JakeTracker {
                 vue.membre = island != null && plugin.islands().canUse(player, island, true);
                 vue.membreRelu = tick + settings.memberCheckTicks;
             }
-            prochain = Math.min(prochain, vue.membreRelu);
+            membreA = Math.min(membreA, vue.membreRelu);
             vue.passe = current;
             vue.distance2 = distance;
             if (envoi == null) {
@@ -369,9 +383,15 @@ final class JakeTracker {
                     if (envoi == null) {
                         envoi = Paquets.envoi(player);
                     }
-                    display.voir(entry.getKey(), player, false);
-                    textes.cacher(envoi, player, entry.getKey(), entry.getValue());
-                    arrivees.loin(id, entry.getKey().island());
+                    Jake jake = entry.getKey();
+                    display.voir(jake, player, false);
+                    textes.cacher(envoi, player, jake, entry.getValue());
+                    // il ne le voit plus : s'il s'est éloigné, son retour sera une arrivée ; un Jake caché ne l'est pas
+                    JakeData d = jake.data();
+                    if (!d.world().equals(world.getName()) || square(ici.getX() - d.x()) + square(ici.getY() - d.y())
+                            + square(ici.getZ() - d.z()) > leave) {
+                        arrivees.loin(id, jake.island());
+                    }
                     it.remove();
                 }
             }
@@ -386,11 +406,13 @@ final class JakeTracker {
         if (envoi != null) {
             envoi.envoyer();
         }
-        if (alerteLue) {
-            prochain = Math.min(prochain, plugin.alerts().prochaineLecture(player));
+        etat.complet(world, ici.getX(), ici.getY(), ici.getZ(), manque ? tick : prochain);
+        etat.alerteA = alerteLue ? plugin.alerts().prochaineLecture(player) : Integer.MAX_VALUE;
+        etat.membreA = membreA;
+        // après un chargement à chaud, l'amorce n'est consommée que par un passage où tout a pu être dessiné
+        if (!manque) {
+            arrivees.finPassage(id);
         }
-        remember(id, etat, world, prochain);
-        arrivees.finPassage(id);
         if (arrivals != null) {
             for (Jake jake : arrivals) {
                 Textes.Vue vue = mine == null ? null : mine.get(jake);
@@ -404,18 +426,44 @@ final class JakeTracker {
         }
     }
 
-    /** Note où est le joueur après un passage complet. */
-    private void remember(UUID id, Etat etat, World world, int prochainComplet) {
-        if (etat == null) {
-            etat = new Etat();
-            etats.put(id, etat);
+    /**
+     * Joueur immobile : son alerte et son appartenance à l'île sont relues à leur rythme, sans passage complet ; une
+     * alerte dont le texte n'a pas changé n'envoie rien. Une appartenance qui change rend le prochain passage complet.
+     */
+    private void leger(Player player, Map<Jake, Textes.Vue> mine, Raccourci etat, int tick) {
+        if (tick >= etat.membreA) {
+            int prochain = Integer.MAX_VALUE;
+            for (Map.Entry<Jake, Textes.Vue> entry : mine.entrySet()) {
+                Textes.Vue vue = entry.getValue();
+                if (tick >= vue.membreRelu) {
+                    Island island = plugin.islands().byId(entry.getKey().data().island());
+                    boolean membre = island != null && plugin.islands().canUse(player, island, true);
+                    vue.membreRelu = tick + plugin.settings().memberCheckTicks;
+                    if (membre != vue.membre) {
+                        etat.salir();
+                    }
+                }
+                prochain = Math.min(prochain, vue.membreRelu);
+            }
+            etat.membreA = prochain;
         }
-        etat.world = world;
-        etat.x = ici.getX();
-        etat.y = ici.getY();
-        etat.z = ici.getZ();
-        etat.changes = registry.changes();
-        etat.prochainComplet = prochainComplet;
+        if (tick >= etat.alerteA) {
+            String alert = plugin.alerts().text(player);
+            Paquets.Envoi envoi = null;
+            for (Map.Entry<Jake, Textes.Vue> entry : mine.entrySet()) {
+                Textes.Vue vue = entry.getValue();
+                if (vue.membre && !alert.equals(vue.alerte)) {
+                    if (envoi == null) {
+                        envoi = Paquets.envoi(player);
+                    }
+                    textes.alerte(envoi, player, entry.getKey(), vue, alert);
+                }
+            }
+            if (envoi != null) {
+                envoi.envoyer();
+            }
+            etat.alerteA = plugin.alerts().prochaineLecture(player);
+        }
     }
 
     /**
