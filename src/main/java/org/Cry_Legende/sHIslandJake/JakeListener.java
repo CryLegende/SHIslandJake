@@ -5,6 +5,7 @@ import com.bgsoftware.superiorskyblock.api.events.IslandDisbandEvent;
 import com.bgsoftware.superiorskyblock.api.island.Island;
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
 import io.papermc.paper.event.player.PlayerClientLoadedWorldEvent;
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -87,7 +88,7 @@ final class JakeListener implements Listener {
         Player player = event.getPlayer();
         plugin.sync(() -> {
             plugin.moves().cancel(player);
-            plugin.tracker().reset(player);
+            plugin.tracker().reset(player, true);
         });
     }
 
@@ -97,15 +98,15 @@ final class JakeListener implements Listener {
         Player player = event.getPlayer();
         plugin.sync(() -> {
             if (player.isOnline()) {
-                plugin.tracker().reset(player);
+                plugin.tracker().reset(player, false);
             }
         });
     }
 
-    /** Une réaction attendait peut-être la fermeture de ce menu. */
+    /** Une réaction attendait peut-être la fermeture de ce menu ; sinon rien ne repasse par le fil principal. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onMenuClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) {
+        if (event.getPlayer() instanceof Player player && plugin.reactions().attend(player.getUniqueId())) {
             plugin.sync(() -> plugin.reactions().fermeture(player));
         }
     }
@@ -114,14 +115,15 @@ final class JakeListener implements Listener {
     @EventHandler
     public void onPluginEnable(PluginEnableEvent event) {
         if (event.getPlugin().getName().equals("BlockDisplayCreator")) {
-            plugin.sync(() -> plugin.display().releaseAll());
+            plugin.sync(() -> plugin.display().moteurChange());
         }
     }
 
     @EventHandler
     public void onPluginDisable(PluginDisableEvent event) {
         if (event.getPlugin().getName().equals("BlockDisplayCreator") && plugin.isEnabled()) {
-            plugin.sync(() -> plugin.display().releaseAll());
+            // le moteur est encore actif pendant cet événement : il ne l'est plus au tick suivant
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.display().moteurChange());
         }
     }
 
@@ -129,6 +131,10 @@ final class JakeListener implements Listener {
 
     @EventHandler
     public void onClickJake(PlayerUseUnknownEntityEvent event) {
+        // une entité qui n'est pas à Jake (autre plugin) ne repasse pas par le fil principal
+        if (!plugin.registry().isJakeEntity(event.getEntityId())) {
+            return;
+        }
         boolean attack = event.isAttack();
         if (attack ? !plugin.settings().leftClick : event.getHand() != EquipmentSlot.HAND) {
             return;

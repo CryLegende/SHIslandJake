@@ -61,7 +61,8 @@ final class Paquets {
             this.player = player;
         }
 
-        private void ecrire(PacketWrapper<?> packet) {
+        /** Faux si le joueur n'a pas (ou plus) de connexion : rien n'est parti. */
+        private boolean ecrire(PacketWrapper<?> packet) {
             if (!cherche) {
                 cherche = true;
                 try {
@@ -71,13 +72,15 @@ final class Paquets {
                 }
             }
             if (user == null) {
-                return;
+                return false;
             }
             try {
                 user.writePacketSilently(packet);
                 ecrit = true;
+                return true;
             } catch (RuntimeException ignored) {
                 // joueur en cours de déconnexion
+                return false;
             }
         }
 
@@ -120,11 +123,11 @@ final class Paquets {
         return data;
     }
 
-    /** Fait apparaître un texte (ou le remplace s'il existe déjà sous ce numéro). */
-    static void texte(Envoi envoi, int id, UUID uuid, double x, double y, double z, List<EntityData<?>> donnees) {
-        envoi.ecrire(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), EntityTypes.TEXT_DISPLAY,
-                new Vector3d(x, y, z), 0f, 0f, 0f, 0, Optional.empty()));
-        envoi.ecrire(new WrapperPlayServerEntityMetadata(id, donnees));
+    /** Fait apparaître un texte (ou le remplace s'il existe déjà sous ce numéro) ; faux si rien n'est parti. */
+    static boolean texte(Envoi envoi, int id, UUID uuid, double x, double y, double z, List<EntityData<?>> donnees) {
+        return envoi.ecrire(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), EntityTypes.TEXT_DISPLAY,
+                new Vector3d(x, y, z), 0f, 0f, 0f, 0, Optional.empty()))
+                && envoi.ecrire(new WrapperPlayServerEntityMetadata(id, donnees));
     }
 
     static void changerTexte(Envoi envoi, int id, Component text) {
@@ -139,11 +142,11 @@ final class Paquets {
                 new EntityData<>(SCALE, EntityDataTypes.VECTOR3F, new Vector3f(scale, scale, scale)))));
     }
 
-    /** Zone cliquable : entité « interaction » posée aux pieds de Jake. */
-    static void zone(Envoi envoi, int id, UUID uuid, double x, double y, double z, float largeur, float hauteur) {
-        envoi.ecrire(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), EntityTypes.INTERACTION,
-                new Vector3d(x, y, z), 0f, 0f, 0f, 0, Optional.empty()));
-        envoi.ecrire(new WrapperPlayServerEntityMetadata(id, List.of(
+    /** Zone cliquable : entité « interaction » posée aux pieds de Jake ; faux si rien n'est parti. */
+    static boolean zone(Envoi envoi, int id, UUID uuid, double x, double y, double z, float largeur, float hauteur) {
+        return envoi.ecrire(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), EntityTypes.INTERACTION,
+                new Vector3d(x, y, z), 0f, 0f, 0f, 0, Optional.empty()))
+                && envoi.ecrire(new WrapperPlayServerEntityMetadata(id, List.of(
                 new EntityData<>(BOX_WIDTH, EntityDataTypes.FLOAT, largeur),
                 new EntityData<>(BOX_HEIGHT, EntityDataTypes.FLOAT, hauteur),
                 new EntityData<>(BOX_RESPONSIVE, EntityDataTypes.BOOLEAN, true))));

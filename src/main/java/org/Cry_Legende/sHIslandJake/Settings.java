@@ -2,6 +2,7 @@ package org.Cry_Legende.sHIslandJake;
 
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
+import org.bukkit.Particle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Display;
@@ -30,7 +31,7 @@ public final class Settings {
      */
     public record Apparence(String id, String modele, float taille, EntityType mob, Material icon, double hauteur,
                             double zoneLargeur, double zoneHauteur, String permission, String caractere,
-                            Map<String, String> sons) {
+                            Map<String, String> sons, List<String> scenes) {
 
         public boolean estModele() {
             return !modele.isEmpty();
@@ -57,7 +58,7 @@ public final class Settings {
 
     /** Apparence de secours quand la configuration n'en a aucune dessinable par FancyNpcs. */
     private static final Apparence VILLAGEOIS = new Apparence("VILLAGER", "", 1f, EntityType.VILLAGER,
-            Material.VILLAGER_SPAWN_EGG, 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of());
+            Material.VILLAGER_SPAWN_EGG, 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of(), List.of());
 
     public final String defaultType;
     public final boolean defaultVisible;
@@ -68,6 +69,14 @@ public final class Settings {
 
     public final int viewDistance;
     public final int trackerInterval;
+    /** Un joueur qui n'a pas bougé de plus que ça (carré, en blocs²) et pour qui rien n'a changé est sauté. */
+    public final double moveThresholdSquared;
+    /** Un passage complet au moins toutes ces ticks, même pour un joueur immobile. */
+    public final int fullPassTicks;
+    /** Appartenance à l'île relue toutes ces ticks. */
+    public final int memberCheckTicks;
+    /** Le moteur est interrogé sur un modèle montré (encore là ?) toutes ces ticks, et à chaque arrivée d'un joueur. */
+    public final int modelCheckTicks;
     public final long forgetMillis;
     public final boolean lookAtPlayers;
     public final int lookDistance;
@@ -122,6 +131,21 @@ public final class Settings {
     public final Remplacements remplacements;
     public final double defaultZoneWidth;
     public final double defaultZoneHeight;
+    public final double maxZoneWidth;
+    /** Marge entre le haut du dessin d'un modèle et le bas du nom. */
+    public final double textMargin;
+    /** Un Jake resté en secours alors que son apparence a un modèle réessaie le modèle toutes ces ticks. */
+    public final int modelRetryTicks;
+
+    public final boolean ambianceEnabled;
+    public final double ambianceDistance;
+    /** Cosinus de « angle-vue » : Jake est devant le joueur quand le cosinus de l'angle est au moins celui-là. */
+    public final double ambianceCosine;
+    public final int ambiancePauseMinTicks;
+    public final int ambiancePauseMaxTicks;
+    public final int defaultAnimationTicks;
+    /** Durée d'une animation (ambiance.durees), en ticks. */
+    public final Map<String, Integer> animationTicks;
 
     public final ReglagesReactions reactions;
 
@@ -184,12 +208,36 @@ public final class Settings {
         }
         secours = secoursLu == null ? VILLAGEOIS : secoursLu;
         usagePermission = c.getString("apparences.permission-usage", "").trim();
-        remplacements = Remplacements.lire(c.getConfigurationSection("apparences.remplacements"));
+        remplacements = ApparencesLues.filtrer(Remplacements.lire(c.getConfigurationSection("apparences.remplacements")),
+                types.keySet(), log::warning);
         defaultZoneWidth = Math.max(0.1, c.getDouble("apparences.zone-clic.largeur", 1.0));
         defaultZoneHeight = Math.max(0.1, c.getDouble("apparences.zone-clic.hauteur", 2.0));
+        maxZoneWidth = Math.max(0.1, c.getDouble("apparences.zone-clic.largeur-max", 1.5));
+        textMargin = c.getDouble("apparences.marge-texte", 0.25);
+        modelRetryTicks = (int) Math.max(20, Math.round(c.getDouble("apparences.reessai-modele-secondes", 60) * 20));
+
+        ambianceEnabled = c.getBoolean("ambiance.actif", true);
+        ambianceDistance = Math.max(1, c.getDouble("ambiance.distance", 10));
+        ambianceCosine = Math.cos(Math.toRadians(Math.min(180, Math.max(0, c.getDouble("ambiance.angle-vue", 70)))));
+        ambiancePauseMinTicks = (int) Math.round(Math.max(0, c.getDouble("ambiance.pause-min-secondes", 15)) * 20);
+        ambiancePauseMaxTicks = (int) Math.round(Math.max(0, c.getDouble("ambiance.pause-max-secondes", 30)) * 20);
+        defaultAnimationTicks = (int) Math.max(1, Math.round(c.getDouble("ambiance.duree-defaut-secondes", 8) * 20));
+        Map<String, Integer> durees = new HashMap<>();
+        ConfigurationSection d = c.getConfigurationSection("ambiance.durees");
+        if (d != null) {
+            for (String anim : d.getKeys(false)) {
+                durees.put(anim, (int) Math.max(1, Math.round(d.getDouble(anim) * 20)));
+            }
+        }
+        animationTicks = Map.copyOf(durees);
 
         viewDistance = Math.max(1, c.getInt("affichage.distance", 32));
         trackerInterval = Math.max(1, c.getInt("affichage.intervalle-ticks", 10));
+        double move = Math.max(0, c.getDouble("affichage.mouvement-minimum", 0.25));
+        moveThresholdSquared = move * move;
+        fullPassTicks = (int) Math.max(trackerInterval, Math.round(c.getDouble("affichage.passage-complet-secondes", 5) * 20));
+        memberCheckTicks = (int) Math.max(20, Math.round(c.getDouble("affichage.verification-membre-secondes", 10) * 20));
+        modelCheckTicks = (int) Math.max(trackerInterval, Math.round(c.getDouble("affichage.verification-modele-secondes", 5) * 20));
         forgetMillis = Math.max(1, c.getInt("affichage.oubli-minutes", 10)) * 60_000L;
         lookAtPlayers = c.getBoolean("affichage.regarder-joueurs", true);
         lookDistance = Math.max(1, c.getInt("affichage.distance-regard", 6));
@@ -236,7 +284,7 @@ public final class Settings {
         alertOffset = c.getDouble("alerte.decalage", 0.6);
         alertCheckTicks = Math.max(1, c.getInt("alerte.verification-ticks", 20));
 
-        reactions = ReglagesReactions.lire(c.getConfigurationSection("reactions"), log::warning);
+        reactions = ReglagesReactions.lire(c.getConfigurationSection("reactions"), log::warning, Settings::particuleValide);
 
         moveSeconds = Math.max(1, c.getInt("deplacement.temps-secondes", 15));
         List<String> sub = new ArrayList<>();
@@ -278,6 +326,21 @@ public final class Settings {
         soundMenu = c.getString("sons.menu", "");
         soundSuccess = c.getString("sons.succes", "");
         soundRefusal = c.getString("sons.refus", "");
+    }
+
+    /** Particule connue du serveur, qui se montre sans données (couleur, bloc...). */
+    static boolean particuleValide(String name) {
+        try {
+            return Particle.valueOf(name.toUpperCase(Locale.ROOT)).getDataType() == Void.class;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /** Durée d'une animation selon la configuration (ambiance.durees, sinon duree-defaut-secondes), en ticks. */
+    public int animationTicks(String animation) {
+        Integer t = animationTicks.get(animation);
+        return t == null ? defaultAnimationTicks : t;
     }
 
     /** Apparence de cet identifiant ; une apparence inconnue (retirée de la configuration) prend celle de jake.type. */
@@ -338,46 +401,21 @@ public final class Settings {
 
     private static Map<String, Apparence> readTypes(ConfigurationSection section, Logger log) {
         Map<String, Apparence> result = new LinkedHashMap<>();
-        if (section == null) {
-            log.warning("Aucune apparence dans « types » : seul VILLAGER est proposé.");
-            result.put(VILLAGEOIS.id(), VILLAGEOIS);
-            return result;
-        }
-        for (String key : section.getKeys(false)) {
-            ConfigurationSection entry = section.getConfigurationSection(key);
-            if (entry == null) {
-                continue;
-            }
-            String id = Remplacements.id(key);
-            String modele = entry.getString("modele", "").trim();
+        for (ApparencesLues.Brute b : ApparencesLues.lire(section, log::warning).values()) {
             EntityType mob = null;
-            if (modele.isEmpty()) {
-                // sans « mob », l'identifiant lui-même (VILLAGER, WITCH...) : la forme des versions 1.x
-                String mobName = entry.getString("mob", key);
-                mob = entityType(mobName, log, "types." + key + ".mob");
+            if (!b.estModele()) {
+                mob = entityType(b.mob(), log, "types." + b.id() + ".mob");
                 if (mob == null) {
                     continue;
                 }
             }
-            Material icon = Material.matchMaterial(entry.getString("icone", "VILLAGER_SPAWN_EGG"));
+            Material icon = Material.matchMaterial(b.icone());
             if (icon == null || !icon.isItem()) {
-                log.warning("types." + key + ".icone inconnue : VILLAGER_SPAWN_EGG est utilisée.");
+                log.warning("types." + b.id() + ".icone inconnue : VILLAGER_SPAWN_EGG est utilisée.");
                 icon = Material.VILLAGER_SPAWN_EGG;
             }
-            double height = entry.contains("hauteur") ? entry.getDouble("hauteur") : modele.isEmpty() ? 2.1 : Double.NaN;
-            double zoneWidth = entry.contains("zone-clic.largeur") ? Math.max(0.1, entry.getDouble("zone-clic.largeur")) : Double.NaN;
-            double zoneHeight = entry.contains("zone-clic.hauteur") ? Math.max(0.1, entry.getDouble("zone-clic.hauteur")) : Double.NaN;
-            Map<String, String> sons = new HashMap<>();
-            ConfigurationSection s = entry.getConfigurationSection("sons");
-            if (s != null) {
-                for (String reaction : s.getKeys(false)) {
-                    sons.put(reaction.toLowerCase(Locale.ROOT), s.getString(reaction, "").trim());
-                }
-            }
-            String caractere = entry.getString("caractere", "defaut").trim();
-            result.put(id, new Apparence(id, modele, (float) Math.max(0.05, entry.getDouble("taille", 1.0)), mob, icon,
-                    height, zoneWidth, zoneHeight, entry.getString("permission", "").trim(),
-                    caractere.isEmpty() ? "defaut" : caractere, Map.copyOf(sons)));
+            result.put(b.id(), new Apparence(b.id(), b.modele(), b.taille(), mob, icon, b.hauteur(), b.zoneLargeur(),
+                    b.zoneHauteur(), b.permission(), b.caractere(), b.sons(), b.scenes()));
         }
         if (result.isEmpty()) {
             log.warning("Aucune apparence lisible dans « types » : seul VILLAGER est proposé.");

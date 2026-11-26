@@ -24,6 +24,7 @@ public final class SHIslandJake extends JavaPlugin {
 
     private static final long SAVE_TICKS = 100L;
     private static final long CLEAN_TICKS = 6000L;
+    private static final long ENGINE_TICKS = 600L;
 
     private volatile Settings settings;
     private volatile Messages messages;
@@ -42,6 +43,8 @@ public final class SHIslandJake extends JavaPlugin {
     private IslandSubCommand islandCommand;
     private BukkitTask saveTask;
     private BukkitTask cleanTask;
+    private BukkitTask engineTask;
+    private JakePlaceholders placeholders;
     private Thread mainThread;
     private long loadMillis;
     private final Mesures mesures = new Mesures();
@@ -121,7 +124,8 @@ public final class SHIslandJake extends JavaPlugin {
             SuperiorSkyblockAPI.registerCommand(islandCommand);
         }
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            new JakePlaceholders(this).register();
+            placeholders = new JakePlaceholders(this);
+            placeholders.register();
         }
         // rechargement à chaud : les joueurs déjà là gardent leur réglage « discret »
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -131,6 +135,8 @@ public final class SHIslandJake extends JavaPlugin {
         tracker.start();
         saveTask = getServer().getScheduler().runTaskTimer(this, () -> store.flush(registry), SAVE_TICKS, SAVE_TICKS);
         cleanTask = getServer().getScheduler().runTaskTimer(this, () -> reactions.nettoyer(), CLEAN_TICKS, CLEAN_TICKS);
+        // un « /bdc reload » peut rallumer ou éteindre le rendu du moteur sans activer ni arrêter le plugin
+        engineTask = getServer().getScheduler().runTaskTimer(this, () -> display.moteurChange(), ENGINE_TICKS, ENGINE_TICKS);
         // Une fois le serveur lancé, SuperiorSkyblock2 connaît toutes les îles
         getServer().getScheduler().runTask(this, () -> {
             int removed = manager.pruneOrphans();
@@ -155,6 +161,16 @@ public final class SHIslandJake extends JavaPlugin {
         }
         if (cleanTask != null) {
             cleanTask.cancel();
+        }
+        if (engineTask != null) {
+            engineTask.cancel();
+        }
+        if (placeholders != null) {
+            try {
+                placeholders.unregister();
+            } catch (RuntimeException | LinkageError ignored) {
+                // PlaceholderAPI déjà arrêté
+            }
         }
         // tout ce qui a été envoyé en paquets est détruit chez les joueurs (textes, bulles, zones)
         if (tracker != null) {

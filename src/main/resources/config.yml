@@ -11,6 +11,10 @@
 #  vue par le seul joueur concerné : un geste du modèle, une réplique dans une
 #  bulle au-dessus de Jake, un son, des particules (voir « reactions »).
 #
+#  Un personnage dessiné par un modèle vit aussi par de courtes scènes
+#  d'ambiance (« ambiance ») : une animation jouée pour un joueur proche qui a
+#  Jake devant lui, quand rien d'autre ne se passe pour lui.
+#
 #  Le corps de Jake vient de son apparence (« types ») : un modèle de
 #  BlockDisplayCreator (« modele ») ou, en secours, un mob dessiné par
 #  FancyNpcs (« mob »). Si le modèle manque (BlockDisplayCreator absent,
@@ -44,13 +48,16 @@
 #    /shislandjake import           reprend les PNJ d'IslandNPC des îles qui
 #                                   n'ont pas encore de Jake
 #    /shislandjake stats            durée des tâches de Jake sur la dernière minute
+#                                   (le temps des réactions d'approche et des scènes
+#                                   d'ambiance est compté aussi dans « suivi »)
 #    /shislandjake react <joueur> <réaction> [texte]
 #                                   joue une réaction pour ce joueur (le texte
 #                                   remplace la réplique) ; ne répond rien, qu'elle
 #                                   joue ou soit abandonnée (joueur loin de Jake...)
 #    /shislandjake say <joueur> <texte>
 #                                   Jake dit ce texte dans une bulle, à ce joueur
-#                                   (codes couleur et placeholders acceptés)
+#                                   (codes couleur ; texte pris tel quel, l'appelant
+#                                   lit ses placeholders ; {joueur}, {nom}, {chef})
 #
 #  Permissions
 #    shislandjake.use             /jake, réglages, apparence, discret (tout le monde)
@@ -92,6 +99,16 @@ affichage:
   distance: 32
   # Ticks entre deux vérifications des Jake proches de chaque joueur.
   intervalle-ticks: 10
+  # Un joueur qui n'a pas bougé de plus de ce nombre de blocs depuis sa dernière vérification, pour qui aucun Jake n'a
+  # changé et dont l'alerte n'est pas à relire est sauté (seule son ambiance est regardée).
+  mouvement-minimum: 0.25
+  # Vérification complète au moins toutes ces secondes, même pour un joueur immobile.
+  passage-complet-secondes: 5
+  # Secondes entre deux lectures de l'appartenance du joueur à l'île du Jake (membre exclu ou invité).
+  verification-membre-secondes: 10
+  # Secondes entre deux questions au moteur sur un modèle montré (toujours là ?) ; il est aussi interrogé quand un
+  # joueur arrive en vue du Jake.
+  verification-modele-secondes: 5
   # Un Jake qu'aucun joueur n'a vu depuis ce nombre de minutes n'est plus
   # dessiné ; il revient avec le prochain joueur.
   oubli-minutes: 10
@@ -204,10 +221,13 @@ alerte:
 #   pour            membres (défaut), visiteurs ou tous
 #   animation       animation du modèle jouée pour ce joueur (ignorée par un corps qui ne l'a pas)
 #   repliques       nom d'une liste de messages.yml (repliques.<caractère>.<liste>, sinon repliques.defaut.<liste>) ;
-#                   une ligne tirée au hasard, jamais deux fois de suite la même
-#   son, volume, pitch   son joué au joueur, à la place de Jake ; vide = types.<apparence>.sons.<réaction>, sinon
-#                   aucun. Un son n'est joué qu'avec un geste, une bulle ou des particules.
-#   particules      « NOM nombre » (HAPPY_VILLAGER 8), envoyées à ce joueur seul, autour de Jake
+#                   une ligne tirée au hasard, jamais deux fois de suite la même ; ses placeholders sont lus pour
+#                   le joueur, puis {joueur}, {nom} (de Jake) et {chef} (de l'île) remplacés
+#   son, volume, pitch   son joué au joueur, à la place de Jake (nom en minuscules : entity.villager.yes) ; vide =
+#                   types.<apparence>.sons.<réaction>, sinon aucun. Un son n'est joué qu'avec un geste, une bulle ou
+#                   des particules.
+#   particules      « NOM nombre » (HAPPY_VILLAGER 8), envoyées à ce joueur seul, autour de Jake ; une particule qui
+#                   demande des données (couleur, bloc) est refusée au chargement
 #   pause-secondes  délai avant de pouvoir rejouer pour ce joueur (en mémoire, remis à zéro au redémarrage)
 #   priorite        à l'arrivée, la réaction possible de plus haute priorité gagne (défaut 0)
 reactions:
@@ -219,6 +239,15 @@ reactions:
   attente-menu-secondes: 30
   # Ticks sans menu rouvert après une fermeture avant que la réaction parte.
   menu-ferme-ticks: 3
+  # Hauteur du son au-dessus des pieds de Jake, en blocs.
+  son-hauteur: 1.0
+  # Particules des réactions : écart horizontal et vertical autour de Jake (blocs), vitesse, et hauteur du nuage
+  # (part de la hauteur du nom : 0.5 = à mi-hauteur).
+  particules:
+    ecart: 0.4
+    ecart-vertical: 0.5
+    vitesse: 0.02
+    hauteur: 0.55
   bonjour:
     approche: true
     priorite: 0
@@ -258,10 +287,32 @@ apparences:
   # Ancien identifiant → nouveau, appliqué aux Jake de jakes.yml au démarrage et au rechargement : bascule toutes les
   # îles d'une apparence à une autre. Exemple : « VILLAGER: AVENTURIER ».
   remplacements:
-  # Zone cliquable d'un modèle quand ni son apparence (zone-clic) ni son dessin ne la donnent, en blocs.
+  # Zone cliquable d'un modèle quand ni son apparence (zone-clic) ni son dessin ne la donnent, en blocs ; largeur-max
+  # borne la largeur prise d'après le dessin (un objet tenu à bout de bras ne l'élargit pas trop).
   zone-clic:
     largeur: 1.0
     hauteur: 2.0
+    largeur-max: 1.5
+  # Marge, en blocs, entre le haut du dessin d'un modèle et le bas du nom (apparence sans « hauteur »).
+  marge-texte: 0.25
+  # Un Jake dessiné en secours parce que son modèle manquait réessaie le modèle toutes ces secondes.
+  reessai-modele-secondes: 60
+
+# Scènes d'ambiance : courtes animations du modèle (types.<apparence>.scenes, animations « trigger: command » de son
+# fichier), jouées pour un joueur seul quand il est à moins de « distance » blocs d'un Jake dessiné par un modèle, qu'il
+# a Jake devant lui (« angle-vue » degrés au plus entre son regard et Jake), qu'il n'est pas discret, et que rien ne se
+# passe pour lui (bulle, réaction en cours ou en attente, pause). Une scène au hasard, jamais deux fois de suite la
+# même ; après chaque scène ou réaction, une pause tirée entre pause-min-secondes et pause-max-secondes. Une réaction
+# passe devant une scène ; une scène n'interrompt rien. Pour les membres comme pour les visiteurs.
+ambiance:
+  actif: true
+  distance: 10
+  angle-vue: 70
+  pause-min-secondes: 15
+  pause-max-secondes: 30
+  # Durée d'une animation (scène ou réaction) quand le moteur ne la donne pas : « durees », sinon celle-ci.
+  duree-defaut-secondes: 8
+  durees:
 
 # Apparences que les joueurs peuvent choisir, dans l'ordre du menu. L'identifiant est libre (AVENTURIER, VILLAGER...).
 #   modele      nom d'un bloc de BlockDisplayCreator (custom-blocks) : Jake est ce modèle ; taille = son échelle
@@ -272,12 +323,16 @@ apparences:
 #   permission  droit d'obtention de cette apparence ; vide = tout le monde
 #   caractere   jeu de répliques (messages.yml, repliques.<caractère>) ; absent = defaut
 #   sons        son de chaque réaction pour cette apparence (quand la réaction n'a pas de « son »)
+#   scenes      animations d'ambiance de ce modèle (voir « ambiance »)
 # Exemple d'apparence dessinée par BlockDisplayCreator :
 #   AVENTURIER:
 #     modele: jake_aventurier
 #     taille: 1.0
 #     icone: SPYGLASS
 #     caractere: aventurier
+#     scenes:
+#       - carte
+#       - sac
 #     sons:
 #       bonjour: entity.villager.ambient
 types:

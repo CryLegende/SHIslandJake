@@ -13,7 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Tous les Jake, retrouvables sans parcourir la liste : par île (lisible depuis tout fil, pour les
  * placeholders), par numéro d'entité (clic d'un joueur sur le PNJ ou sur la zone d'un modèle) et par position, dans
- * une grille de cases de 32 blocs. Hors lecture par île, tout se fait sur le fil principal.
+ * une grille de cases de 32 blocs. Hors lecture par île et tri des numéros d'entité, tout se fait sur le fil principal.
+ * Un compteur de changements dit au suivi qu'un Jake a bougé, changé ou été redessiné.
  */
 final class JakeRegistry {
 
@@ -21,8 +22,11 @@ final class JakeRegistry {
 
     private final Map<UUID, Jake> islands = new ConcurrentHashMap<>();
     private final Map<Integer, Jake> entities = new HashMap<>();
-    private final Map<String, Map<Long, List<Jake>>> grid = new HashMap<>();
+    /** Les mêmes numéros, lisibles depuis le fil d'un monde : un clic sur une autre entité ne repasse pas par le fil principal. */
+    private final Set<Integer> ids = ConcurrentHashMap.newKeySet();
+    private final Map<String, Cases> grid = new HashMap<>();
     private final Set<Jake> drawn = new HashSet<>();
+    private int changes;
 
     Jake get(UUID island) {
         return island == null ? null : islands.get(island);
@@ -36,16 +40,26 @@ final class JakeRegistry {
         return islands.size();
     }
 
+    /** Augmente à chaque changement d'un Jake (place, apparence, visibilité, dessin). */
+    int changes() {
+        return changes;
+    }
+
+    void changed() {
+        changes++;
+    }
+
     /** Remplace le Jake que l'île avait déjà ; renvoie l'ancien. */
     Jake add(Jake jake) {
         Jake previous = islands.put(jake.island(), jake);
         if (previous != null) {
             unindex(previous);
             if (previous.numerote()) {
-                entities.remove(previous.zoneId(), previous);
+                unlink(previous.zoneId());
             }
         }
         index(jake);
+        changes++;
         return previous;
     }
 
@@ -53,8 +67,9 @@ final class JakeRegistry {
         islands.remove(jake.island(), jake);
         unindex(jake);
         if (jake.numerote()) {
-            entities.remove(jake.zoneId(), jake);
+            unlink(jake.zoneId());
         }
+        changes++;
     }
 
     /** Nouvelles données du Jake, la grille suit sa position. */
@@ -62,18 +77,26 @@ final class JakeRegistry {
         unindex(jake);
         jake.setData(data);
         index(jake);
+        changes++;
     }
 
     void link(int entityId, Jake jake) {
         entities.put(entityId, jake);
+        ids.add(entityId);
     }
 
     void unlink(int entityId) {
         entities.remove(entityId);
+        ids.remove(entityId);
     }
 
     Jake byEntity(int entityId) {
         return entities.get(entityId);
+    }
+
+    /** Ce numéro est-il celui d'un Jake (PNJ ou zone) ? Depuis n'importe quel fil. */
+    boolean isJakeEntity(int entityId) {
+        return ids.contains(entityId);
     }
 
     /** Jake dessinés en ce moment (par FancyNpcs ou par BlockDisplayCreator). */
@@ -81,21 +104,25 @@ final class JakeRegistry {
         return drawn;
     }
 
+    /**
+     * Un Jake qui n'est plus dessiné compte comme un changement (ceux qui le voyaient doivent le recevoir de nouveau) ;
+     * un Jake dessiné non : il l'est au passage d'un joueur qui le voit déjà.
+     */
     void markDrawn(Jake jake, boolean drawnNow) {
         if (drawnNow) {
             drawn.add(jake);
-        } else {
-            drawn.remove(jake);
+        } else if (drawn.remove(jake)) {
+            changes++;
         }
     }
 
     /**
      * Jake des cases autour d'une position, un peu au-delà de la distance demandée, ajoutés à « out » (vidée d'abord).
-     * Un Jake n'est que dans une case : pas de doublon.
+     * Un Jake n'est que dans une case : pas de doublon. Aucun objet créé.
      */
     void near(String world, int blockX, int blockZ, int distance, List<Jake> out) {
         out.clear();
-        Map<Long, List<Jake>> cells = grid.get(world);
+        Cases cells = grid.get(world);
         if (cells == null) {
             return;
         }
@@ -123,14 +150,12 @@ final class JakeRegistry {
 
     private void index(Jake jake) {
         JakeData d = jake.data();
-        grid.computeIfAbsent(d.world(), w -> new HashMap<>())
-                .computeIfAbsent(cell(d), k -> new ArrayList<>(2))
-                .add(jake);
+        grid.computeIfAbsent(d.world(), w -> new Cases()).ouvrir(cell(d)).add(jake);
     }
 
     private void unindex(Jake jake) {
         JakeData d = jake.data();
-        Map<Long, List<Jake>> cells = grid.get(d.world());
+        Cases cells = grid.get(d.world());
         if (cells == null) {
             return;
         }
@@ -139,7 +164,7 @@ final class JakeRegistry {
         if (cell != null) {
             cell.remove(jake);
             if (cell.isEmpty()) {
-                cells.remove(key);
+                cells.retirer(key);
             }
         }
     }

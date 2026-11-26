@@ -23,7 +23,7 @@ Le corps vient de l'apparence de Jake (`types`) :
 - **un modèle de BlockDisplayCreator** (`modele`, `taille`) : rien n'est écrit dans le monde, le moteur le montre aux joueurs proches, avec son regard, son sommeil et ses animations. Une zone cliquable (entité « interaction » envoyée en paquets) prend les clics, à la taille du dessin ou de `zone-clic` ;
 - **un mob dessiné par FancyNpcs** (`mob`), le corps de secours : il se tourne vers chaque joueur qui s'approche (`affichage.regarder-joueurs`), et seulement pour lui.
 
-Si le modèle d'une apparence manque (BlockDisplayCreator absent, fichier introuvable), Jake est dessiné avec l'apparence `apparences.secours` et un avertissement est écrit en console, une fois par apparence : il n'y a jamais d'île sans Jake. Quand BlockDisplayCreator revient, les Jake reprennent leur modèle. `apparences.remplacements` fait passer toutes les îles d'une apparence à une autre (« VILLAGER: AVENTURIER »), au démarrage et au rechargement.
+Si le modèle d'une apparence manque (BlockDisplayCreator absent, fichier introuvable), Jake est dessiné avec l'apparence `apparences.secours` et un avertissement est écrit en console, une fois par apparence : il n'y a jamais d'île sans Jake. Un modèle que le moteur connaît mais n'a pas encore lu (premier dessin demandé depuis une commande) est redemandé au tick suivant, sans passer par le secours. Un Jake resté en secours réessaie son modèle toutes les `apparences.reessai-modele-secondes`, et tous reprennent leur modèle quand BlockDisplayCreator revient. Le nom se pose au-dessus du dessin du modèle (`apparences.marge-texte`), la zone cliquable à sa largeur (au plus `apparences.zone-clic.largeur-max`). `apparences.remplacements` fait passer toutes les îles d'une apparence à une autre (« VILLAGER: AVENTURIER »), au démarrage et au rechargement.
 
 ### Ce que Jake dit
 
@@ -43,6 +43,10 @@ Une réaction (`reactions` de `config.yml`) est vue par le seul joueur concerné
 
 Conditions (`si`, placeholders lus pour le joueur, seulement à l'arrivée et pour une commande), public (`pour` : membres, visiteurs, tous) et pause par joueur (`pause-secondes`). Une réaction demandée loin de tout Jake (`reactions.portee-commande`) est abandonnée sans un mot. Un joueur qui a un menu ouvert attend sa fermeture. Un son n'est joué qu'avec un geste, une bulle ou des particules.
 
+### Les scènes d'ambiance
+
+Un personnage n'a aucune boucle permanente : au repos il est immobile (aucun paquet), et il vit par de courtes scènes (`types.<ID>.scenes`, animations « par commande » de son modèle). Une scène est jouée pour un joueur seul quand il est à moins de `ambiance.distance` blocs d'un Jake dessiné par un modèle, qu'il a Jake devant lui (`ambiance.angle-vue`), qu'il n'est pas discret et que rien ne se passe pour lui (bulle, réaction en cours ou en attente). Une scène au hasard, jamais deux fois de suite la même, puis une pause tirée entre `ambiance.pause-min-secondes` et `ambiance.pause-max-secondes`. Une réaction passe devant une scène ; une scène n'interrompt rien. La durée d'une animation vient du moteur s'il sait la donner, sinon de `ambiance.durees`, sinon de `ambiance.duree-defaut-secondes`.
+
 Chaque joueur peut rendre Jake **discret** (`/jake discret`, bouton des réglages) : ni bulle, ni geste, ni son ; l'alerte reste.
 
 ### Les apparences
@@ -59,7 +63,7 @@ Réglages de Jake (`/jake reglages`, accroupi + clic, ou `/jake` quand `jake-san
 
 ### Performances
 
-Le plugin garde lui-même ses Jake (`jakes.yml`) ; ils ne sont dessinés que là où un joueur passe. Le suivi ne regarde que la grille autour de chaque joueur, toutes les `affichage.intervalle-ticks` ticks : le nombre d'îles n'entre pas en compte, et ce qu'un joueur a reçu n'est renvoyé que s'il change. Les placeholders ne sont lus qu'à l'arrivée, pour une commande et pour l'alerte (une fois par `alerte.verification-ticks`). Un joueur immobile ne coûte rien au regard du corps de secours. Les paquets d'un joueur partent ensemble ; tout ce qui a été envoyé est détruit au départ du joueur, au changement de monde, à la réapparition, au retrait du Jake et à l'arrêt du plugin. Avec les mondes en parallèle de DivineMC, tout passe par le fil principal. `/shislandjake stats` donne la durée des tâches sur la dernière minute.
+Le plugin garde lui-même ses Jake (`jakes.yml`) ; ils ne sont dessinés que là où un joueur passe. Le suivi ne regarde que la grille autour de chaque joueur, toutes les `affichage.intervalle-ticks` ticks : le nombre d'îles n'entre pas en compte, et ce qu'un joueur a reçu n'est renvoyé que s'il change. Un joueur qui n'a pas bougé de plus de `affichage.mouvement-minimum` bloc, pour qui aucun Jake n'a changé et dont l'alerte n'est pas à relire est sauté (seule son ambiance est regardée). Le moteur n'est interrogé sur un modèle montré que toutes les `affichage.verification-modele-secondes` et à l'arrivée d'un joueur. L'état « près de Jake » survit à un rechargement ou à un Jake redessiné : seule une vraie arrivée déclenche une réaction. Les placeholders ne sont lus qu'à l'arrivée, pour une commande et pour l'alerte (une fois par `alerte.verification-ticks`). Un joueur immobile ne coûte rien au regard du corps de secours. Les paquets d'un joueur partent ensemble ; tout ce qui a été envoyé est détruit au départ du joueur, au changement de monde, à la réapparition, au retrait du Jake et à l'arrêt du plugin. Avec les mondes en parallèle de DivineMC, tout passe par le fil principal. `/shislandjake stats` donne la durée des tâches sur la dernière minute.
 
 Remplace IslandNPC : au premier démarrage, les PNJ de `plugins/IslandNPC/database.db` sont repris (type, visibilité, monde, position). Les anciennes commandes `/islandnpc`, `/isnpc` et leurs sous-commandes `location`, `visibility`, `mob` restent acceptées.
 
@@ -85,9 +89,11 @@ Facultatives : `BlockDisplayCreator` (corps « modèle » ; sans lui, le corps d
 | `/shislandjake info [joueur]` | `shislandjake.admin.info` | Nombre de Jake, ou le Jake de l'île d'un joueur (et ce qui le dessine) |
 | `/shislandjake delete [joueur]` | `shislandjake.admin.delete` | Retire le Jake de l'île où l'on est (ou d'un joueur) ; il revient au prochain `/jake` |
 | `/shislandjake import` | `shislandjake.admin.import` | Reprend les PNJ d'IslandNPC des îles sans Jake |
-| `/shislandjake stats` | `shislandjake.admin.stats` | Durée des tâches de Jake sur la dernière minute (suivi, regard, réactions, bulles) |
+| `/shislandjake stats` | `shislandjake.admin.stats` | Durée des tâches de Jake sur la dernière minute (suivi, regard, réactions, bulles ; le temps des réactions d'approche et des scènes est compté aussi dans « suivi ») |
 | `/shislandjake react <joueur> <réaction> [texte]` | `shislandjake.admin.react` | Joue une réaction pour ce joueur ; le texte remplace la réplique. Ne répond rien, qu'elle joue ou soit abandonnée |
 | `/shislandjake say <joueur> <texte>` | `shislandjake.admin.say` | Jake dit ce texte dans une bulle, à ce joueur seul |
+
+Le texte donné à `react` ou `say` est pris tel quel (l'appelant lit ses placeholders) ; seuls `{joueur}`, `{nom}` et `{chef}` y sont remplacés. Les répliques de `messages.yml` passent une fois par PlaceholderAPI, avant ces jetons : ce qui vient d'un joueur n'est jamais relu.
 
 `shislandjake.admin` donne toutes les sous-commandes de `/shislandjake`, `shislandjake.bypass` (cliquer sur le Jake de n'importe quelle île), `shislandjake.type.*` et `shislandjake.personnages`. Les droits des apparences sont `op` par défaut : les joueurs les reçoivent par leur groupe. `shislandjake.personnages` est le droit d'usage proposé pour `apparences.permission-usage`.
 
@@ -101,7 +107,7 @@ Cliquez sur un fichier pour l'ouvrir (valeurs d'exemple) :
 
 <pre>
 plugins/SHIslandJake/
-├── <a href="src/main/resources/config.yml">config.yml</a>     place de départ, affichage, textes et bulles, clic, réactions, apparences, menus, sons
+├── <a href="src/main/resources/config.yml">config.yml</a>     place de départ, affichage, textes et bulles, clic, réactions, ambiance, apparences, menus, sons
 ├── <a href="src/main/resources/messages.yml">messages.yml</a>   messages du chat, nom et alerte, format des bulles, répliques, menus, noms des apparences
 └── jakes.yml       le Jake de chaque île (écrit par le plugin)
 </pre>

@@ -97,6 +97,15 @@ final class CorpsMob implements Corps {
     }
 
     @Override
+    public void arreter(Jake jake, Player pour) {
+    }
+
+    @Override
+    public int duree(Jake jake, String animation) {
+        return -1;
+    }
+
+    @Override
     public boolean vivant(Jake jake) {
         return jake.handle() != null;
     }

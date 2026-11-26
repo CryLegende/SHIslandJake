@@ -1,7 +1,9 @@
 package org.Cry_Legende.sHIslandJake;
 
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -14,6 +16,8 @@ import java.util.regex.PatternSyntaxException;
 final class Condition {
 
     private static final String[] OPS = {" == ", " != ", " >= ", " <= ", " > ", " < ", " ~ "};
+    /** Expressions régulières déjà lues (elles viennent de config.yml : leur nombre est borné). */
+    private static final Map<String, Pattern> MOTIFS = new ConcurrentHashMap<>();
 
     private Condition() {
     }
@@ -39,6 +43,11 @@ final class Condition {
         return false;
     }
 
+    /** Vrai si l'expression ne contient aucun placeholder : elle se lit sans PlaceholderAPI. */
+    static boolean sansPlaceholder(String expr) {
+        return expr.indexOf('%') < 0;
+    }
+
     /** Toutes vraies ; une liste vide est vraie. */
     static boolean toutes(List<String> conditions, UnaryOperator<String> placeholders) {
         for (String c : conditions) {
@@ -62,7 +71,7 @@ final class Condition {
             String right = expr.substring(at + op.length());
             if (op.equals(" ~ ")) {
                 try {
-                    return Pattern.compile(right.trim()).matcher(left).find();
+                    return MOTIFS.computeIfAbsent(right.trim(), Pattern::compile).matcher(left).find();
                 } catch (PatternSyntaxException e) {
                     return false;
                 }

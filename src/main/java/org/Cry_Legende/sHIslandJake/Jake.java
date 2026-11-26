@@ -34,6 +34,18 @@ final class Jake {
     private UUID paroleUuid;
     private UUID zoneUuid;
     private long lastSeen;
+    /** Dessiné par le corps de secours alors que son apparence a un modèle (il réessaiera le modèle). */
+    private boolean secours;
+    /** Hauteur et zone prises par défaut : le moteur n'avait pas encore lu le dessin du modèle. */
+    private boolean bornesProvisoires;
+    /** Ticks du serveur : prochaine question au moteur (encore montré ?), prochain essai du modèle depuis le secours. */
+    int prochainControle;
+    int prochainEssaiModele;
+    /** Dernier tick où ce Jake a été vérifié par le suivi : plusieurs joueurs autour ne le vérifient qu'une fois. */
+    int verifie = Integer.MIN_VALUE;
+    /** Demandes de dessin restées sans réponse du moteur (modèle pas encore lu), et dernier tick où il est relancé. */
+    int essaisPlusTard;
+    int relance = Integer.MIN_VALUE;
 
     Jake(JakeData data) {
         this.data = data;
@@ -80,6 +92,25 @@ final class Jake {
         this.dessinee = null;
         this.zoneLargeur = 0;
         this.zoneHauteur = 0;
+        this.secours = false;
+        this.bornesProvisoires = false;
+        this.verifie = Integer.MIN_VALUE;
+    }
+
+    boolean secours() {
+        return secours;
+    }
+
+    void setSecours(boolean secours) {
+        this.secours = secours;
+    }
+
+    boolean bornesProvisoires() {
+        return bornesProvisoires;
+    }
+
+    void setBornesProvisoires(boolean provisoires) {
+        this.bornesProvisoires = provisoires;
     }
 
     Npc handle() {

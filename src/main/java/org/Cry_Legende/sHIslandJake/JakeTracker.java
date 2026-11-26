@@ -22,8 +22,9 @@ import java.util.logging.Level;
 /**
  * Montre à chaque joueur les Jake proches de lui : leur corps, leurs textes et, pour un modèle, la zone cliquable. On
  * ne regarde que la grille autour du joueur : un joueur loin de toute île ne coûte qu'une recherche par passage, et le
- * nombre de Jake n'entre pas en compte. Ce qu'un joueur a reçu d'un Jake n'est renvoyé que s'il change. Repère aussi
- * l'arrivée d'un joueur près de Jake (réactions d'approche). Fil principal.
+ * nombre de Jake n'entre pas en compte. Ce qu'un joueur a reçu d'un Jake n'est renvoyé que s'il change, et un joueur
+ * qui n'a pas bougé, pour qui aucun Jake n'a changé et dont l'alerte n'est pas à relire est sauté (seule son ambiance
+ * est regardée). Repère aussi l'arrivée d'un joueur près de Jake ({@link Arrivees}). Fil principal.
  *
  * <p>Corps de secours : Jake se tourne vers chaque joueur qui s'approche, et seulement pour lui, par
  * {@link Npc#lookAt}. Le passage lent (« intervalle-ticks ») range dans {@code looks} les Jake à moins de
@@ -65,15 +66,29 @@ final class JakeTracker {
         }
     }
 
+    /** Où était un joueur au dernier passage complet, et quand il en faudra un autre même s'il ne bouge pas. */
+    private static final class Etat {
+        World world;
+        double x;
+        double y;
+        double z;
+        int changes = -1;
+        int prochainComplet;
+    }
+
     private final SHIslandJake plugin;
     private final JakeRegistry registry;
     private final JakeDisplay display;
     private final Textes textes;
+    private final Arrivees arrivees = new Arrivees();
     private final Map<UUID, Map<Jake, Textes.Vue>> vues = new HashMap<>();
     private final Map<UUID, Map<Jake, Look>> looks = new HashMap<>();
+    private final Map<UUID, Etat> etats = new HashMap<>();
     private final Set<UUID> joining = new HashSet<>();
     /** Liste réutilisée d'un passage à l'autre (fil principal, jamais deux passages à la fois). */
     private final List<Jake> nearBuffer = new ArrayList<>();
+    private final Location ici = new Location(null, 0, 0, 0);
+    private final Set<String> erreurs = new HashSet<>();
     private BukkitTask visibilityTask;
     private BukkitTask lookTask;
     private BukkitTask forgetTask;
@@ -85,6 +100,10 @@ final class JakeTracker {
         this.registry = registry;
         this.display = display;
         this.textes = textes;
+        // chargement à chaud : là où sont déjà les joueurs n'est pas une arrivée
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            arrivees.amorcer(player.getUniqueId());
+        }
     }
 
     void start() {
@@ -123,6 +142,7 @@ final class JakeTracker {
         }
         vues.clear();
         looks.clear();
+        etats.clear();
     }
 
     void join(Player player) {
@@ -133,7 +153,7 @@ final class JakeTracker {
 
     void clientLoaded(Player player) {
         joining.remove(player.getUniqueId());
-        refresh(player);
+        refresh(player, true);
     }
 
     void quit(Player player) {
@@ -141,6 +161,8 @@ final class JakeTracker {
         joining.remove(id);
         vues.remove(id);
         looks.remove(id);
+        etats.remove(id);
+        arrivees.oublier(id);
         display.forget(player);
         textes.oublier(id);
         plugin.alerts().forget(player);
@@ -149,11 +171,17 @@ final class JakeTracker {
     /**
      * Changement de monde ou réapparition : tout ce que le joueur a reçu est détruit (le client garde les entités
      * d'une réapparition dans le même monde, et le suivi pourrait avoir renvoyé un texte juste avant), puis renvoyé.
+     *
+     * @param ailleurs vrai pour un changement de monde : son retour près d'un Jake sera une arrivée
      */
-    void reset(Player player) {
+    void reset(Player player, boolean ailleurs) {
         UUID id = player.getUniqueId();
         Map<Jake, Textes.Vue> mine = vues.remove(id);
         looks.remove(id);
+        etats.remove(id);
+        if (ailleurs) {
+            arrivees.oublier(id);
+        }
         if (mine != null) {
             Paquets.Envoi envoi = Paquets.envoi(player);
             for (Map.Entry<Jake, Textes.Vue> entry : mine.entrySet()) {
@@ -169,7 +197,7 @@ final class JakeTracker {
     void refreshSoon(Player player) {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline()) {
-                refresh(player);
+                refresh(player, true);
             }
         }, 2L);
     }
@@ -180,12 +208,12 @@ final class JakeTracker {
         int distance = plugin.settings().viewDistance;
         double range = (distance + 16.0) * (distance + 16.0);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            Location location = player.getLocation();
+            player.getLocation(ici);
             Map<Jake, Textes.Vue> previous = vues.get(player.getUniqueId());
-            boolean near = location.getWorld().getName().equals(d.world())
-                    && square(location.getX() - d.x()) + square(location.getZ() - d.z()) <= range;
+            boolean near = ici.getWorld().getName().equals(d.world())
+                    && square(ici.getX() - d.x()) + square(ici.getZ() - d.z()) <= range;
             if (near || previous != null && previous.containsKey(jake)) {
-                refresh(player);
+                refresh(player, true);
             }
         }
     }
@@ -220,23 +248,42 @@ final class JakeTracker {
     private void refreshAll() {
         long start = plugin.mesures().debut();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            refresh(player);
+            try {
+                refresh(player, false);
+            } catch (RuntimeException e) {
+                // un joueur qui pose problème n'empêche pas le passage des suivants
+                if (erreurs.add(e.getClass().getName() + e.getStackTrace()[0])) {
+                    plugin.getLogger().log(Level.WARNING, "Suivi de " + player.getName() + " impossible", e);
+                }
+            }
         }
         plugin.mesures().fin(Mesures.Tache.SUIVI, start);
     }
 
-    private void refresh(Player player) {
+    private void refresh(Player player, boolean force) {
         UUID id = player.getUniqueId();
         if (joining.contains(id)) {
             return;
         }
         Settings settings = plugin.settings();
-        Location location = player.getLocation();
-        String world = location.getWorld().getName();
-        List<Jake> near = nearBuffer;
-        registry.near(world, location.getBlockX(), location.getBlockZ(), settings.viewDistance, near);
+        player.getLocation(ici);
+        World world = ici.getWorld();
+        int tick = Bukkit.getCurrentTick();
+        Etat etat = etats.get(id);
         Map<Jake, Textes.Vue> mine = vues.get(id);
+        if (!force && etat != null && etat.world == world && etat.changes == registry.changes() && tick < etat.prochainComplet
+                && square(ici.getX() - etat.x) + square(ici.getY() - etat.y) + square(ici.getZ() - etat.z) < settings.moveThresholdSquared) {
+            // rien n'a bougé : seule l'ambiance (le joueur a pu tourner la tête vers Jake)
+            if (mine != null) {
+                plugin.reactions().ambiance(player, mine, ici);
+            }
+            return;
+        }
+        List<Jake> near = nearBuffer;
+        registry.near(world.getName(), ici.getBlockX(), ici.getBlockZ(), settings.viewDistance, near);
         if (near.isEmpty() && mine == null) {
+            remember(id, etat, world, tick + settings.fullPassTicks);
+            arrivees.finPassage(id);
             return;
         }
         int current = ++pass;
@@ -245,20 +292,22 @@ final class JakeTracker {
         double lookRange = square(settings.lookDistance + LOOK_MARGIN);
         double enter = square(settings.reactions.distance);
         double leave = square(settings.reactions.distance + HYSTERESIS);
+        int prochain = tick + settings.fullPassTicks;
         Map<Jake, Look> myLooks = looks.get(id);
         if (myLooks != null) {
             myLooks.values().forEach(look -> look.near = false);
         }
         Paquets.Envoi envoi = null;
         List<Jake> arrivals = null;
+        boolean alerteLue = false;
         for (Jake jake : near) {
             JakeData d = jake.data();
             if (!d.visible()) {
                 continue;
             }
-            double distance = square(location.getX() - d.x()) + square(location.getY() - d.y())
-                    + square(location.getZ() - d.z());
-            if (distance > range || !display.montrer(jake)) {
+            double distance = square(ici.getX() - d.x()) + square(ici.getY() - d.y()) + square(ici.getZ() - d.z());
+            Textes.Vue vue = mine == null ? null : mine.get(jake);
+            if (distance > range || !display.montrer(jake, vue == null)) {
                 continue;
             }
             jake.seen(now);
@@ -266,29 +315,37 @@ final class JakeTracker {
                 mine = new HashMap<>();
                 vues.put(id, mine);
             }
-            Textes.Vue vue = mine.get(jake);
+            // un Jake redessiné pendant ce passage a pu retirer la vue
+            vue = mine.get(jake);
             if (vue == null) {
                 vue = new Textes.Vue();
-                Island island = plugin.islands().byId(d.island());
-                vue.membre = island != null && plugin.islands().canUse(player, island, true);
+                vue.membreRelu = Integer.MIN_VALUE;
                 mine.put(jake, vue);
             }
+            if (tick >= vue.membreRelu) {
+                Island island = plugin.islands().byId(d.island());
+                vue.membre = island != null && plugin.islands().canUse(player, island, true);
+                vue.membreRelu = tick + settings.memberCheckTicks;
+            }
+            prochain = Math.min(prochain, vue.membreRelu);
             vue.passe = current;
+            vue.distance2 = distance;
             if (envoi == null) {
                 envoi = Paquets.envoi(player);
             }
             display.voir(jake, player, true);
             textes.montrer(envoi, jake, vue);
-            String alert = vue.membre ? plugin.alerts().text(player) : "";
+            String alert = "";
+            if (vue.membre) {
+                alert = plugin.alerts().text(player);
+                alerteLue = true;
+            }
             textes.alerte(envoi, player, jake, vue, alert);
-            if (!vue.pres && distance <= enter) {
-                vue.pres = true;
+            if (arrivees.passe(id, d.island(), distance, enter, leave)) {
                 if (arrivals == null) {
                     arrivals = new ArrayList<>(1);
                 }
                 arrivals.add(jake);
-            } else if (vue.pres && distance > leave) {
-                vue.pres = false;
             }
             Npc handle = jake.handle();
             if (settings.lookAtPlayers && handle != null && distance <= lookRange) {
@@ -297,8 +354,8 @@ final class JakeTracker {
                     looks.put(id, myLooks);
                 }
                 Look look = myLooks.get(jake);
-                if (look == null || look.handle != handle || look.world != location.getWorld()) {
-                    look = new Look(handle, location.getWorld(), d.yaw(), d.pitch());
+                if (look == null || look.handle != handle || look.world != world) {
+                    look = new Look(handle, world, d.yaw(), d.pitch());
                     myLooks.put(jake, look);
                 }
                 look.near = true;
@@ -314,12 +371,14 @@ final class JakeTracker {
                     }
                     display.voir(entry.getKey(), player, false);
                     textes.cacher(envoi, player, entry.getKey(), entry.getValue());
+                    arrivees.loin(id, entry.getKey().island());
                     it.remove();
                 }
             }
             // un Jake redessiné pendant le passage a pu retirer cette liste de « vues » : elle y est remise
             if (mine.isEmpty()) {
                 vues.remove(id);
+                mine = null;
             } else {
                 vues.put(id, mine);
             }
@@ -327,6 +386,11 @@ final class JakeTracker {
         if (envoi != null) {
             envoi.envoyer();
         }
+        if (alerteLue) {
+            prochain = Math.min(prochain, plugin.alerts().prochaineLecture(player));
+        }
+        remember(id, etat, world, prochain);
+        arrivees.finPassage(id);
         if (arrivals != null) {
             for (Jake jake : arrivals) {
                 Textes.Vue vue = mine == null ? null : mine.get(jake);
@@ -335,6 +399,23 @@ final class JakeTracker {
                 }
             }
         }
+        if (mine != null) {
+            plugin.reactions().ambiance(player, mine, ici);
+        }
+    }
+
+    /** Note où est le joueur après un passage complet. */
+    private void remember(UUID id, Etat etat, World world, int prochainComplet) {
+        if (etat == null) {
+            etat = new Etat();
+            etats.put(id, etat);
+        }
+        etat.world = world;
+        etat.x = ici.getX();
+        etat.y = ici.getY();
+        etat.z = ici.getZ();
+        etat.changes = registry.changes();
+        etat.prochainComplet = prochainComplet;
     }
 
     /**

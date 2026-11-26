@@ -19,6 +19,12 @@ interface Corps {
     /** Animation pour ce joueur seul ; faux si elle n'existe pas. */
     boolean jouer(Jake jake, String animation, Player pour);
 
+    /** Arrête les animations jouées pour ce joueur seul (une réaction passe devant une scène). */
+    void arreter(Jake jake, Player pour);
+
+    /** Durée d'une animation en ticks, si le corps la connaît ; -1 sinon. */
+    int duree(Jake jake, String animation);
+
     /** Encore dessiné ; faux si le dessin a été lâché (chunk déchargé, moteur rechargé...). */
     boolean vivant(Jake jake);
 }

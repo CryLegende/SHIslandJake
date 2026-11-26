@@ -43,8 +43,8 @@ final class JakeManager {
         }
         Settings s = plugin.settings();
         return new JakeData(island.getUniqueId(), center.getWorld().getName(), center.getX() + s.offset.getX(),
-                center.getY() + s.offset.getY(), center.getZ() + s.offset.getZ(), s.yaw, s.pitch, s.defaultType,
-                s.defaultVisible);
+                center.getY() + s.offset.getY(), center.getZ() + s.offset.getZ(), s.yaw, s.pitch,
+                s.remplacements.appliquer(s.defaultType), s.defaultVisible);
     }
 
     /** Pose le Jake d'une île à sa place de départ (création d'île, Jake disparu). */

@@ -56,6 +56,16 @@ final class AlertCondition {
         return out.toString();
     }
 
+    /** Tick où l'alerte de ce joueur doit être relue (maintenant si elle ne l'a jamais été) ; jamais si elle est éteinte. */
+    int prochaineLecture(Player player) {
+        Settings s = plugin.settings();
+        if (!s.alertEnabled || s.alertPlaceholder.isEmpty()) {
+            return Integer.MAX_VALUE;
+        }
+        Cached c = cache.get(player.getUniqueId());
+        return c == null ? Bukkit.getCurrentTick() : c.untilTick();
+    }
+
     void forget(Player player) {
         cache.remove(player.getUniqueId());
     }

@@ -1,5 +1,6 @@
 package org.Cry_Legende.sHIslandJake;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.util.ArrayList;
@@ -42,16 +43,27 @@ final class ReglagesReactions {
     final double porteeCommande;
     final int attenteMenuTicks;
     final int menuFermeTicks;
+    /** Particules : écart horizontal et vertical autour de Jake, vitesse, hauteur (part de la hauteur du nom). */
+    final double particulesEcart;
+    final double particulesEcartVertical;
+    final double particulesVitesse;
+    final double particulesHauteur;
+    /** Hauteur du son au-dessus des pieds de Jake, en blocs. */
+    final double sonHauteur;
     private final Map<String, Reaction> parNom;
     /** Réactions d'approche, de la plus haute priorité à la plus basse (ordre du fichier à priorité égale). */
     private final List<Reaction> approche;
 
-    private ReglagesReactions(double distance, double porteeCommande, int attenteMenuTicks, int menuFermeTicks,
-                              Map<String, Reaction> parNom) {
-        this.distance = distance;
-        this.porteeCommande = porteeCommande;
-        this.attenteMenuTicks = attenteMenuTicks;
-        this.menuFermeTicks = menuFermeTicks;
+    private ReglagesReactions(ConfigurationSection s, Map<String, Reaction> parNom) {
+        this.distance = s == null ? 6 : Math.max(1, s.getDouble("distance", 6));
+        this.porteeCommande = s == null ? 16 : Math.max(1, s.getDouble("portee-commande", 16));
+        this.attenteMenuTicks = s == null ? 600 : (int) Math.round(Math.max(0, s.getDouble("attente-menu-secondes", 30)) * 20);
+        this.menuFermeTicks = s == null ? 3 : Math.max(1, s.getInt("menu-ferme-ticks", 3));
+        this.particulesEcart = s == null ? 0.4 : Math.max(0, s.getDouble("particules.ecart", 0.4));
+        this.particulesEcartVertical = s == null ? 0.5 : Math.max(0, s.getDouble("particules.ecart-vertical", 0.5));
+        this.particulesVitesse = s == null ? 0.02 : Math.max(0, s.getDouble("particules.vitesse", 0.02));
+        this.particulesHauteur = s == null ? 0.55 : Math.max(0, s.getDouble("particules.hauteur", 0.55));
+        this.sonHauteur = s == null ? 1.0 : s.getDouble("son-hauteur", 1.0);
         this.parNom = Collections.unmodifiableMap(parNom);
         List<Reaction> list = new ArrayList<>();
         for (Reaction r : parNom.values()) {
@@ -63,19 +75,23 @@ final class ReglagesReactions {
         this.approche = List.copyOf(list);
     }
 
-    /** @param avertir reçoit un message par réaction mal écrite (elle est ignorée ou corrigée) */
+    /** Lecture sans vérifier les noms de particules (essais). */
     static ReglagesReactions lire(ConfigurationSection section, Consumer<String> avertir) {
-        if (section == null) {
-            return new ReglagesReactions(6, 16, 600, 3, new LinkedHashMap<>());
-        }
-        double distance = Math.max(1, section.getDouble("distance", 6));
-        double portee = Math.max(1, section.getDouble("portee-commande", 16));
-        int attente = (int) Math.round(Math.max(0, section.getDouble("attente-menu-secondes", 30)) * 20);
-        int ferme = Math.max(1, section.getInt("menu-ferme-ticks", 3));
+        return lire(section, avertir, p -> true);
+    }
+
+    /**
+     * @param avertir         reçoit un message par réaction mal écrite (elle est ignorée, ou la clé fautive retirée)
+     * @param particuleValide vrai pour un nom de particule utilisable sans données (vérifié par le serveur)
+     */
+    static ReglagesReactions lire(ConfigurationSection section, Consumer<String> avertir, Predicate<String> particuleValide) {
         Map<String, Reaction> parNom = new LinkedHashMap<>();
+        if (section == null) {
+            return new ReglagesReactions(null, parNom);
+        }
         for (String key : section.getKeys(false)) {
             ConfigurationSection r = section.getConfigurationSection(key);
-            if (r == null) {
+            if (r == null || key.equals("particules")) {
                 continue;
             }
             String nom = key.toLowerCase(Locale.ROOT);
@@ -100,6 +116,15 @@ final class ReglagesReactions {
             if (si == null) {
                 continue;
             }
+            // les conditions sans placeholder d'abord : elles ne coûtent rien et peuvent éviter de lire les autres
+            List<String> triees = new ArrayList<>(si.size());
+            si.stream().filter(Condition::sansPlaceholder).forEach(triees::add);
+            si.stream().filter(c -> !Condition.sansPlaceholder(c)).forEach(triees::add);
+            String son = r.getString("son", "").trim();
+            if (!son.isEmpty() && !sonValide(son)) {
+                avertir.accept("reactions." + key + ".son « " + son + " » n'est pas un nom de son (minuscules, ex. entity.villager.yes) : ignoré.");
+                son = "";
+            }
             String particule = "";
             int nombre = 0;
             String p = r.getString("particules", "").trim();
@@ -114,14 +139,24 @@ final class ReglagesReactions {
                         avertir.accept("reactions." + key + ".particules « " + p + " » : nombre illisible, 1 est utilisé.");
                     }
                 }
+                if (!particuleValide.test(particule)) {
+                    avertir.accept("reactions." + key + ".particules : « " + parts[0] + " » inconnue ou demande des données (couleur...) : ignorée.");
+                    particule = "";
+                    nombre = 0;
+                }
             }
-            parNom.put(nom, new Reaction(nom, r.getBoolean("approche", false), List.copyOf(si), pour,
+            parNom.put(nom, new Reaction(nom, r.getBoolean("approche", false), List.copyOf(triees), pour,
                     r.getString("animation", "").trim(), r.getString("repliques", "").trim(),
-                    r.getString("son", "").trim(), (float) r.getDouble("volume", 1.0), (float) r.getDouble("pitch", 1.0),
+                    son, (float) r.getDouble("volume", 1.0), (float) r.getDouble("pitch", 1.0),
                     particule, nombre, Math.round(Math.max(0, r.getDouble("pause-secondes", 0)) * 1000),
                     r.getInt("priorite", 0)));
         }
-        return new ReglagesReactions(distance, portee, attente, ferme, parNom);
+        return new ReglagesReactions(section, parNom);
+    }
+
+    /** Nom de son Minecraft ou d'un pack (« entity.villager.yes », « monpack:jake.salut »). */
+    static boolean sonValide(String son) {
+        return NamespacedKey.fromString(son) != null;
     }
 
     Reaction get(String nom) {
