@@ -33,6 +33,10 @@
 #  Au premier démarrage, les PNJ d'IslandNPC (plugins/IslandNPC/database.db)
 #  sont repris : position, type et visibilité de chaque île.
 #
+#  Guide du staff (ajouter un personnage, une réaction ou une réplique, faire
+#  réagir Jake depuis un autre plugin, faire passer toutes les îles à un autre
+#  personnage) : LISEZ-MOI.txt, posé à côté de ce fichier.
+#
 #  Commandes joueur (alias /jack, /islandnpc, /isnpc, et /is jake, /is npc)
 #    /jake                      ouvre les réglages de Jake (ou lance jake-sans-argument.commande)
 #    /jake reglages [origine]   ouvre les réglages de Jake
@@ -71,9 +75,10 @@
 #    shislandjake.visibilite      cacher ou montrer Jake (tout le monde)
 #    shislandjake.type.<type>     apparences de Jake (voir « types ») ; op par défaut
 #    shislandjake.type.*          toutes les apparences de la configuration par défaut (op)
-#    shislandjake.personnages     droit d'usage proposé pour apparences.permission-usage (op)
+#    shislandjake.personnages     utiliser les apparences obtenues (apparences.permission-usage) :
+#                                 à donner aux grades VIP et plus, jamais aux op d'office
 #    shislandjake.bypass          cliquer sur le Jake de n'importe quelle île (op)
-#    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass, type.*, personnages (op)
+#    shislandjake.admin           toutes les sous-commandes de /shislandjake, bypass, type.* (op)
 #    shislandjake.admin.<sous-commande>   reload, info, delete, import, stats, react, say
 #
 #  Placeholders
@@ -86,7 +91,7 @@
 
 jake:
   # Apparence de Jake à la création d'une île ; doit figurer dans « types ».
-  type: VILLAGER
+  type: AVENTURIER
   # Jake visible à la création d'une île.
   visible: true
   # Crée Jake à la création d'une île. Sinon, il apparaît au premier /jake.
@@ -293,16 +298,28 @@ sous-commandes-ile:
   - npc
 
 apparences:
-  # Apparence « mob » dessinée quand le modèle d'une apparence est introuvable ou que BlockDisplayCreator est
-  # absent (un avertissement en console par apparence). Vide = la première apparence « mob » de « types ».
+  # Apparence « mob » dessinée à la place d'un modèle introuvable (BlockDisplayCreator absent, fichier manquant), avec
+  # un avertissement en console par apparence. Nommée ici, elle n'est jamais proposée aux joueurs, et un Jake qui l'a
+  # (ou dont l'apparence n'est plus dans « types ») est dessiné avec jake.type. Vide = la première apparence « mob »
+  # de « types », proposée comme les autres.
   secours: VILLAGER
-  # Droit exigé en plus du droit d'obtention (types.<ID>.permission) pour utiliser une apparence : les apparences
-  # s'obtiennent en jouant, mais ne s'utilisent qu'avec ce droit (grades VIP). Vide = le droit d'obtention suffit.
-  # Le droit se vérifie au moment du choix.
-  permission-usage: ""
-  # Ancien identifiant → nouveau, appliqué aux Jake de jakes.yml au démarrage et au rechargement : bascule toutes les
-  # îles d'une apparence à une autre. Exemple : « VILLAGER: AVENTURIER ».
+  # Droit exigé pour utiliser une apparence qui s'obtient (types.<ID>.obtention ou types.<ID>.permission) : elles
+  # s'obtiennent en jouant, mais ne s'utilisent qu'avec ce droit, donné aux grades VIP et plus (shislandjake.personnages
+  # n'est pas donné aux op d'office). Une apparence sans obtention est à tout le monde. Vérifié au moment du choix ;
+  # une apparence déjà choisie n'est jamais retirée. Vide = l'obtention suffit.
+  permission-usage: shislandjake.personnages
+  # Ancien identifiant → nouveau, appliqué aux Jake de jakes.yml au démarrage et au rechargement : fait passer toutes
+  # les îles d'une apparence à une autre ; l'ancienne n'est plus proposée. L'apparence de secours peut être remplacée :
+  # elle reste dans « types » pour dessiner Jake quand un modèle manque, sans être proposée.
+  # Le jour où le modèle JAKE_aventurier est en production : décommentez les six lignes ci-dessous et rechargez.
+  # (Avant cela, un Jake de ces apparences est déjà dessiné en Aventurier, mais jakes.yml garde l'ancien nom.)
   remplacements:
+  #  VILLAGER: AVENTURIER
+  #  EVOKER: AVENTURIER
+  #  PILLAGER: AVENTURIER
+  #  VINDICATOR: AVENTURIER
+  #  WANDERING_TRADER: AVENTURIER
+  #  WITCH: AVENTURIER
   # Zone cliquable d'un modèle quand ni son apparence (zone-clic) ni son dessin ne la donnent, en blocs ; largeur-max
   # borne la largeur prise d'après le dessin (un objet tenu à bout de bras ne l'élargit pas trop).
   zone-clic:
@@ -341,62 +358,89 @@ ambiance:
   duree-defaut-secondes: 8
   durees:
 
-# Apparences que les joueurs peuvent choisir, dans l'ordre du menu. L'identifiant est libre (AVENTURIER, VILLAGER...).
-#   modele      nom d'un bloc de BlockDisplayCreator (custom-blocks) : Jake est ce modèle ; taille = son échelle
-#   mob         sans « modele » : type Minecraft dessiné par FancyNpcs (VILLAGER, WITCH...) ; absent = l'identifiant
-#   icone       objet du menu
-#   hauteur     bas du nom au-dessus des pieds de Jake, en blocs ; absent pour un modèle = d'après son dessin
-#   zone-clic   largeur et hauteur de la zone cliquable d'un modèle ; absente = d'après son dessin
-#   permission  droit d'obtention de cette apparence ; vide = tout le monde
-#   caractere   jeu de répliques (messages.yml, repliques.<caractère>) ; absent = defaut
-#   sons        son de chaque réaction pour cette apparence (quand la réaction n'a pas de « son »)
-#   scenes      animations d'ambiance de ce modèle (voir « ambiance »)
-#   vie         animations de vie de ce modèle, enchaînées sans arrêt pour le joueur qui regarde Jake (voir « ambiance »)
-# Exemple d'apparence dessinée par BlockDisplayCreator :
-#   AVENTURIER:
-#     modele: jake_aventurier
-#     taille: 1.0
-#     icone: SPYGLASS
-#     caractere: aventurier
-#     scenes:
-#       - carte
-#       - sac
-#     vie:
-#       - respire
-#       - respire2
-#     sons:
-#       bonjour: entity.villager.ambient
+# Apparences que les joueurs peuvent choisir, dans l'ordre des cartes du menu Apparence (/jake type). L'identifiant est
+# libre (AVENTURIER, ARBRE...). Nom, phrase de caractère et texte d'obtention : messages.yml, types.<ID>. Comment
+# ajouter un personnage : LISEZ-MOI.txt.
+#   modele            nom d'un bloc de BlockDisplayCreator (custom-blocks) : Jake est ce modèle ; taille = son échelle
+#   mob               sans « modele » : type Minecraft dessiné par FancyNpcs (VILLAGER, WITCH...) ; absent = l'identifiant
+#   icone             objet de la carte : matériau, tête HeadDatabase (hdb-81626) ou tête texturée (basehead-<base64>)
+#   hauteur           bas du nom au-dessus des pieds de Jake, en blocs ; absent pour un modèle = d'après son dessin
+#   zone-clic         largeur et hauteur de la zone cliquable d'un modèle ; absente = d'après son dessin
+#   caractere         jeu de répliques (messages.yml, repliques.<caractère>) ; absent = defaut
+#   sons              son de chaque réaction pour cette apparence (quand la réaction n'a pas de « son »)
+#   scenes            animations d'ambiance de ce modèle (voir « ambiance »)
+#   vie               animations de vie de ce modèle, enchaînées sans arrêt pour le joueur qui regarde Jake
+#   obtention         conditions lues pour le joueur (écrites comme les « si » des réactions), toutes vraies pour obtenir
+#                     l'apparence ; lues au dessin du menu et au moment du choix. Absente = à tout le monde.
+#   obtention-valeur  placeholder de la valeur qui avance (%shjobs_player_level_bucheron%) : la carte d'une apparence
+#                     pas obtenue montre où en est le joueur, sur le nombre de la condition qui le compare (4 / 10)
+#   permission        droit d'obtention, en plus des conditions ; vide = aucun
+# Une apparence qui s'obtient (obtention ou permission) ne s'utilise qu'avec apparences.permission-usage.
 types:
+  AVENTURIER:
+    modele: JAKE_aventurier
+    taille: 1.0
+    icone: FILLED_MAP
+    zone-clic:
+      largeur: 1.2
+      hauteur: 2.4
+    scenes:
+      - carte
+      - sac
+      - somnole
+    vie:
+      - respire
+      - respire2
+  # Apparence de secours (apparences.secours) : jamais proposée, dessinée seulement à la place d'un modèle qui manque.
   VILLAGER:
     mob: VILLAGER
     icone: VILLAGER_SPAWN_EGG
     hauteur: 2.1
-    permission: shislandjake.type.villager
-  EVOKER:
-    mob: EVOKER
-    icone: EVOKER_SPAWN_EGG
-    hauteur: 2.1
-    permission: shislandjake.type.evoker
-  PILLAGER:
-    mob: PILLAGER
-    icone: PILLAGER_SPAWN_EGG
-    hauteur: 2.1
-    permission: shislandjake.type.pillager
-  VINDICATOR:
-    mob: VINDICATOR
-    icone: VINDICATOR_SPAWN_EGG
-    hauteur: 2.1
-    permission: shislandjake.type.vindicator
-  WANDERING_TRADER:
-    mob: WANDERING_TRADER
-    icone: WANDERING_TRADER_SPAWN_EGG
-    hauteur: 2.1
-    permission: shislandjake.type.wandering_trader
-  WITCH:
-    mob: WITCH
-    icone: WITCH_SPAWN_EGG
-    hauteur: 2.55
-    permission: shislandjake.type.witch
+  # Personnages à venir. Décommentez un bloc le jour où son modèle est dans les blocs du moteur (custom-blocks), avec ses
+  # scènes et sa vie, et ses lignes dans messages.yml (types.<ID>). Le niveau 10 est un réglage : le texte d'obtention
+  # le reprend tout seul ({objectif}).
+  #ARBRE:
+  #  modele: JAKE_arbre
+  #  icone: OAK_SAPLING
+  #  caractere: arbre
+  #  obtention:
+  #    - "%shjobs_player_level_bucheron% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_bucheron%"
+  #GOLEM:
+  #  modele: JAKE_golem
+  #  icone: IRON_BLOCK
+  #  caractere: golem
+  #  obtention:
+  #    - "%shjobs_player_level_mineur% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_mineur%"
+  #EPOUVANTAIL:
+  #  modele: JAKE_epouvantail
+  #  icone: HAY_BLOCK
+  #  caractere: epouvantail
+  #  obtention:
+  #    - "%shjobs_player_level_agriculteur% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_agriculteur%"
+  #CHAT:
+  #  modele: JAKE_chat
+  #  icone: STRING
+  #  caractere: chat
+  #  obtention:
+  #    - "%shjobs_player_level_chasseur% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_chasseur%"
+  #ETABLI:
+  #  modele: JAKE_etabli
+  #  icone: CRAFTING_TABLE
+  #  caractere: etabli
+  #  obtention:
+  #    - "%shjobs_player_level_artisan% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_artisan%"
+  #LOUTRE:
+  #  modele: JAKE_loutre
+  #  icone: COD
+  #  caractere: loutre
+  #  obtention:
+  #    - "%shjobs_player_level_pecheur% >= 10"
+  #  obtention-valeur: "%shjobs_player_level_pecheur%"
 
 menu:
   # Vitres des deux menus : le tour (contour) et les colonnes 2 et 8 entre les deux (accent). Vide = pas de vitre.
@@ -430,20 +474,18 @@ menu:
     # Retour selon le menu d'où vient le joueur : /jake reglages <origine>. Ex. « guide: guide » pour un menu
     # qui ouvre les réglages avec /jake reglages guide.
     retours:
-  # Apparence de Jake : les apparences prennent les cases dans l'ordre de « types ».
+  # Apparence de Jake : une carte par apparence proposée, dans l'ordre de « types », réparties toutes seules dans les
+  # lignes du milieu (cinq au plus par ligne, centrées) ; une page de plus seulement si elles ne tiennent pas, avec
+  # les flèches page-precedente et page-suivante.
   types:
     lignes: 5
     remplissage: ''
     jake: 4
-    cases:
-      - 21
-      - 22
-      - 23
-      - 30
-      - 31
-      - 32
     retour: 36
     retour-materiau: PAPER
+    page-precedente: 39
+    page-suivante: 41
+    page-materiau: ARROW
 
 sons:
   # Sons joués au joueur. Vide = aucun son. Noms des sons Minecraft

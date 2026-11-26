@@ -3,11 +3,12 @@ package org.Cry_Legende.sHIslandJake;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.EntityType;
-import org.bukkit.permissions.Permissible;
+import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 
 /**
@@ -29,12 +31,18 @@ public final class Settings {
      * sinon {@code mob} = le corps de secours dessiné par FancyNpcs. {@code hauteur} et la zone cliquable valent NaN
      * quand elles doivent venir du dessin du modèle.
      */
-    public record Apparence(String id, String modele, float taille, EntityType mob, Material icon, double hauteur,
+    public record Apparence(String id, String modele, float taille, EntityType mob, String icone, double hauteur,
                             double zoneLargeur, double zoneHauteur, String permission, String caractere,
-                            Map<String, String> sons, List<String> scenes, List<String> vie) {
+                            Map<String, String> sons, List<String> scenes, List<String> vie, List<String> obtention,
+                            String obtentionValeur) {
 
         public boolean estModele() {
             return !modele.isEmpty();
+        }
+
+        /** L'apparence s'obtient (droit ou conditions) : elle demande aussi le droit d'usage. */
+        public boolean aObtention() {
+            return !permission.isEmpty() || !obtention.isEmpty();
         }
     }
 
@@ -58,7 +66,7 @@ public final class Settings {
 
     /** Apparence de secours quand la configuration n'en a aucune dessinable par FancyNpcs. */
     private static final Apparence VILLAGEOIS = new Apparence("VILLAGER", "", 1f, EntityType.VILLAGER,
-            Material.VILLAGER_SPAWN_EGG, 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of(), List.of(), List.of());
+            "VILLAGER_SPAWN_EGG", 2.1, Double.NaN, Double.NaN, "", "defaut", Map.of(), List.of(), List.of(), List.of(), "");
 
     public final String defaultType;
     public final boolean defaultVisible;
@@ -133,6 +141,8 @@ public final class Settings {
     /** Apparence dessinée par FancyNpcs quand un modèle manque. */
     public final Apparence secours;
     public final String usagePermission;
+    /** Identifiant de l'apparence de secours nommée dans apparences.secours (jamais proposée) ; vide = aucune. */
+    public final String secoursCache;
     public final Remplacements remplacements;
     public final double defaultZoneWidth;
     public final double defaultZoneHeight;
@@ -174,9 +184,11 @@ public final class Settings {
     /** Retour selon d'où le menu a été ouvert : /jake reglages <origine> ; une origine inconnue garde backCommand. */
     public final Map<String, String> backByOrigin;
     public final Frame typesFrame;
-    public final List<Integer> typesSlots;
     public final int typesBackSlot;
     public final Material typesBackMaterial;
+    public final int typesPreviousSlot;
+    public final int typesNextSlot;
+    public final Material typesPageMaterial;
 
     public final String soundClick;
     public final String soundMenu;
@@ -215,9 +227,11 @@ public final class Settings {
             }
         }
         secours = secoursLu == null ? VILLAGEOIS : secoursLu;
+        // nommée dans apparences.secours : jamais proposée, ne sert qu'à la place d'un modèle qui manque
+        secoursCache = secoursLu != null && secoursLu.id().equals(fallback) ? fallback : "";
         usagePermission = c.getString("apparences.permission-usage", "").trim();
         remplacements = ApparencesLues.filtrer(Remplacements.lire(c.getConfigurationSection("apparences.remplacements")),
-                types.keySet(), log::warning);
+                types.keySet(), secoursCache, log::warning);
         defaultZoneWidth = Math.max(0.1, c.getDouble("apparences.zone-clic.largeur", 1.0));
         defaultZoneHeight = Math.max(0.1, c.getDouble("apparences.zone-clic.hauteur", 2.0));
         maxZoneWidth = Math.max(0.1, c.getDouble("apparences.zone-clic.largeur-max", 1.5));
@@ -341,9 +355,11 @@ public final class Settings {
         }
         backByOrigin = Map.copyOf(origins);
         typesFrame = frame(c, "menu.types", log);
-        typesSlots = List.copyOf(c.getIntegerList("menu.types.cases"));
         typesBackSlot = c.getInt("menu.types.retour", 36);
         typesBackMaterial = material(c, "menu.types.retour-materiau", Material.PAPER, log);
+        typesPreviousSlot = c.getInt("menu.types.page-precedente", 39);
+        typesNextSlot = c.getInt("menu.types.page-suivante", 41);
+        typesPageMaterial = material(c, "menu.types.page-materiau", Material.ARROW, log);
 
         soundClick = c.getString("sons.clic", "");
         soundMenu = c.getString("sons.menu", "");
@@ -372,28 +388,27 @@ public final class Settings {
         return remplacements.table().containsKey(Remplacements.id(id));
     }
 
-    /** Apparence de cet identifiant ; une apparence inconnue (retirée de la configuration) prend celle de jake.type. */
+    /** Proposée aux joueurs (menu, /jake type, Tab) : ni remplacée, ni l'apparence de secours nommée. */
+    public boolean proposee(Apparence a) {
+        return !remplacee(a.id()) && !a.id().equals(secoursCache);
+    }
+
+    /**
+     * Apparence dessinée pour cet identifiant ; une apparence inconnue (retirée de la configuration) ou l'apparence de
+     * secours cachée prend celle de jake.type.
+     */
     public Apparence apparence(String id) {
-        Apparence a = types.get(Remplacements.id(id));
-        if (a == null) {
-            a = types.get(defaultType);
-        }
+        Apparence a = types.get(ApparencesLues.resolue(id, types.keySet(), defaultType, secoursCache));
         return a == null ? secours : a;
     }
 
-    /** Ce que ce joueur peut faire de cette apparence. Sans permission-usage, le droit de l'apparence suffit. */
-    public Etat etat(Permissible player, Apparence a) {
-        if (a.permission().isEmpty()) {
-            return Etat.DISPONIBLE;
-        }
-        boolean obtenue = player.hasPermission(a.permission());
-        if (usagePermission.isEmpty()) {
-            return obtenue ? Etat.DISPONIBLE : Etat.RESERVE;
-        }
-        if (!obtenue) {
-            return Etat.NON_OBTENUE;
-        }
-        return player.hasPermission(usagePermission) ? Etat.DISPONIBLE : Etat.RESERVE;
+    /**
+     * Ce que ce joueur peut faire de cette apparence (conditions d'obtention lues pour lui) : sans obtention, elle est à
+     * tout le monde ; sinon droit et conditions d'obtention, puis apparences.permission-usage.
+     */
+    public Etat etat(CommandSender who, Apparence a) {
+        UnaryOperator<String> lecteur = who instanceof Player p ? Reactions.lecteur(p) : UnaryOperator.identity();
+        return Obtention.etat(a.permission(), a.obtention(), who::hasPermission, lecteur, usagePermission);
     }
 
     /** Cadre du menu « path » ; sans cases écrites, le bord est le tour du menu et l'accent les colonnes 2 et 8. */
@@ -438,13 +453,18 @@ public final class Settings {
                     continue;
                 }
             }
-            Material icon = Material.matchMaterial(b.icone());
-            if (icon == null || !icon.isItem()) {
-                log.warning("types." + b.id() + ".icone inconnue : VILLAGER_SPAWN_EGG est utilisée.");
-                icon = Material.VILLAGER_SPAWN_EGG;
+            String icone = b.icone().trim();
+            String lower = icone.toLowerCase(Locale.ROOT);
+            if (!lower.startsWith("hdb-") && !lower.startsWith("basehead-")) {
+                Material icon = Material.matchMaterial(icone);
+                if (icon == null || !icon.isItem()) {
+                    log.warning("types." + b.id() + ".icone « " + icone + " » inconnue : VILLAGER_SPAWN_EGG est utilisée.");
+                    icone = "VILLAGER_SPAWN_EGG";
+                }
             }
-            result.put(b.id(), new Apparence(b.id(), b.modele(), b.taille(), mob, icon, b.hauteur(), b.zoneLargeur(),
-                    b.zoneHauteur(), b.permission(), b.caractere(), b.sons(), b.scenes(), b.vie()));
+            result.put(b.id(), new Apparence(b.id(), b.modele(), b.taille(), mob, icone, b.hauteur(), b.zoneLargeur(),
+                    b.zoneHauteur(), b.permission(), b.caractere(), b.sons(), b.scenes(), b.vie(), b.obtention(),
+                    b.obtentionValeur()));
         }
         if (result.isEmpty()) {
             log.warning("Aucune apparence lisible dans « types » : seul VILLAGER est proposé.");

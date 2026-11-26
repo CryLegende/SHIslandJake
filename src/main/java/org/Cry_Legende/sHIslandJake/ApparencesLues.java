@@ -21,7 +21,7 @@ final class ApparencesLues {
     /** Une apparence telle qu'écrite ; {@code hauteur} et la zone valent NaN quand elles doivent venir du dessin. */
     record Brute(String id, String modele, float taille, String mob, String icone, double hauteur, double zoneLargeur,
                  double zoneHauteur, String permission, String caractere, Map<String, String> sons,
-                 List<String> scenes, List<String> vie) {
+                 List<String> scenes, List<String> vie, List<String> obtention, String obtentionValeur) {
 
         boolean estModele() {
             return !modele.isEmpty();
@@ -72,11 +72,24 @@ final class ApparencesLues {
                     vie.add(animation.trim());
                 }
             }
+            List<String> obtention = new ArrayList<>();
+            for (String condition : entry.getStringList("obtention")) {
+                if (condition.isBlank()) {
+                    continue;
+                }
+                if (!Condition.valide(condition)) {
+                    // gardée : une condition fausse vaut mieux qu'une apparence donnée à tout le monde
+                    avertir.accept("types." + key + ".obtention « " + condition + " » illisible (opérateur == != >= <= > < ~"
+                            + " entouré d'espaces) : cette apparence ne s'obtient pas.");
+                }
+                obtention.add(condition.trim());
+            }
             String caractere = entry.getString("caractere", "defaut").trim();
             result.put(id, new Brute(id, modele, (float) Math.max(0.05, entry.getDouble("taille", 1.0)), mob,
                     entry.getString("icone", "VILLAGER_SPAWN_EGG"), hauteur, zoneLargeur, zoneHauteur,
                     entry.getString("permission", "").trim(), caractere.isEmpty() ? "defaut" : caractere,
-                    Map.copyOf(sons), List.copyOf(scenes), List.copyOf(vie)));
+                    Map.copyOf(sons), List.copyOf(scenes), List.copyOf(vie), List.copyOf(obtention),
+                    entry.getString("obtention-valeur", "").trim()));
         }
         return result;
     }
@@ -85,19 +98,33 @@ final class ApparencesLues {
      * Les remplacements dont la cible est une apparence de « types » (les autres sont ignorés, avec un avertissement) ;
      * avertit aussi quand un identifiant remplacé reste dans « types » (un joueur pourrait le reprendre).
      */
-    static Remplacements filtrer(Remplacements lus, Set<String> ids, Consumer<String> avertir) {
+    static Remplacements filtrer(Remplacements lus, Set<String> ids, String secours, Consumer<String> avertir) {
         Map<String, String> gardes = new LinkedHashMap<>();
         lus.table().forEach((from, to) -> {
             if (!ids.contains(to)) {
                 avertir.accept("apparences.remplacements : « " + from + ": " + to + " » ignoré, " + to + " n'est pas dans « types ».");
             } else {
                 gardes.put(from, to);
-                if (ids.contains(from)) {
+                if (ids.contains(from) && !from.equals(secours)) {
                     avertir.accept("apparences.remplacements : " + from + " est remplacé par " + to
-                            + " mais reste dans « types » : un joueur peut encore le choisir.");
+                            + " mais reste dans « types » sans servir (il n'est plus proposé) : retirez-le de « types »,"
+                            + " sauf s'il est l'apparence de secours.");
                 }
             }
         });
         return new Remplacements(gardes);
+    }
+
+    /**
+     * L'apparence dessinée pour un Jake de type « id » : la sienne si elle est dans « types », proposée ou non ;
+     * celle de jake.type si elle n'y est plus ou si c'est l'apparence de secours cachée (le secours ne se dessine qu'à
+     * la place d'un modèle qui manque).
+     */
+    static String resolue(String id, Set<String> ids, String defaut, String secoursCache) {
+        String i = Remplacements.id(id);
+        if (ids.contains(i) && !i.equals(secoursCache)) {
+            return i;
+        }
+        return defaut;
     }
 }

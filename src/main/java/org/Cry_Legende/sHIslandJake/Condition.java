@@ -43,6 +43,20 @@ final class Condition {
         return false;
     }
 
+    /** Côté gauche, opérateur (sans espaces) et côté droit de l'expression, non lus ; null sans opérateur connu. */
+    static String[] parties(String expr) {
+        if (expr == null) {
+            return null;
+        }
+        for (String op : OPS) {
+            int at = expr.indexOf(op);
+            if (at >= 0) {
+                return new String[]{expr.substring(0, at).trim(), op.trim(), expr.substring(at + op.length()).trim()};
+            }
+        }
+        return null;
+    }
+
     /** Vrai si l'expression ne contient aucun placeholder : elle se lit sans PlaceholderAPI. */
     static boolean sansPlaceholder(String expr) {
         return expr.indexOf('%') < 0;

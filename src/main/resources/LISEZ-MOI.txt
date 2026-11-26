@@ -1,0 +1,177 @@
+SHIslandJake, le guide du staff
+===============================
+
+Ce fichier explique comment tout changer soi-même : ajouter un personnage, changer ce que Jake
+dit, le faire réagir depuis un autre plugin, faire passer toutes les îles à un autre personnage.
+Il est reposé tel quel s'il manque. Vos changements vont dans config.yml et messages.yml, jamais
+dans ce fichier.
+
+Après un changement de config.yml ou de messages.yml, tapez /shislandjake reload. Un fichier mal
+écrit est refusé et nommé dans la console, et l'ancienne configuration reste en place.
+
+
+1. AJOUTER UN PERSONNAGE
+------------------------
+
+Un personnage est un modèle de BlockDisplayCreator (le moteur des modèles). Il se prépare en
+trois temps : le fichier du modèle, sa déclaration dans config.yml, ses textes dans messages.yml.
+
+Le fichier du modèle
+
+Posez le fichier (par exemple JAKE_arbre.yml) dans plugins/BlockDisplayCreator/custom-blocks/,
+puis tapez /bdc reload JAKE_arbre. Le nom du fichier sans « .yml » est le nom du modèle.
+
+Les animations du modèle suivent quatre règles.
+
+  - La pose de repos, celle du fichier quand rien ne joue, est une pose éveillée : c'est elle
+    que tout le monde voit entre deux animations. Jamais les yeux fermés, jamais endormi.
+  - Toutes les animations sont en « trigger: command ». C'est SHIslandJake qui les joue, pour
+    un seul joueur à la fois. Une animation en boucle, à l'approche ou au clic jouerait pour
+    tout le monde en même temps.
+  - Le porteur, la pièce qui porte toutes les autres, ne descend jamais sous le sol. S'il entre
+    dans le bloc du dessous, tout le modèle devient noir. Un saut monte, il ne s'enfonce pas.
+  - Ce qui apparaît ou disparaît (une paupière, un objet sorti du sac) le fait d'un coup, avec
+    « over: 0 ». Sinon on le voit grandir puis rétrécir. Une pièce cachée garde une toute petite
+    taille (0.001), jamais 0.
+
+Chaque animation part de la pose de repos et y revient. Jake en utilise trois sortes.
+
+  - La vie : respirer, bouger un peu. Deux animations de 10 à 14 secondes suffisent. Elles
+    s'enchaînent sans arrêt pour le joueur qui regarde Jake.
+  - Les scènes : lire sa carte, fouiller son sac. Une de temps en temps, pour le joueur qui
+    regarde Jake quand rien d'autre ne se passe.
+  - Les gestes des réactions (joie, cadeau, coucou), nommés dans la section « reactions ».
+
+La déclaration dans config.yml
+
+Ajoutez un bloc dans la section « types ». L'ordre des blocs est l'ordre des cartes du menu
+Apparence. Voici un exemple complet.
+
+  types:
+    ARBRE:
+      modele: JAKE_arbre
+      taille: 1.0
+      icone: OAK_SAPLING
+      caractere: arbre
+      scenes:
+        - feuilles
+        - etire
+      vie:
+        - respire
+        - respire2
+      obtention:
+        - "%shjobs_player_level_bucheron% >= 10"
+      obtention-valeur: "%shjobs_player_level_bucheron%"
+
+ARBRE est l'identifiant du personnage, en majuscules. Après « modele », le nom du fichier du
+modèle. Après « scenes » et « vie », des noms d'animations de ce fichier : une animation qui n'y
+est pas est signalée une fois dans la console et n'est pas jouée. L'icône de la carte du menu est
+un objet (OAK_SAPLING), une tête de HeadDatabase (hdb-81626) ou une tête texturée (basehead-
+collé au texte base64 de la texture). Le caractère choisit les répliques de Jake sous ce
+personnage (voir plus bas).
+
+Les lignes « obtention » sont des conditions, toutes vraies pour obtenir le personnage. Elles
+s'écrivent comme les conditions « si » des réactions : un placeholder, un espace, un opérateur
+(== != >= <= > <), un espace, une valeur. Elles sont lues pour le joueur quand il ouvre le menu
+et quand il choisit. Un personnage qui s'obtient ne s'utilise qu'avec le droit écrit dans
+« apparences.permission-usage » (shislandjake.personnages, à donner aux grades VIP et plus ; il
+n'est pas donné aux op). Un personnage sans « obtention » est à tout le monde. Une apparence déjà
+choisie n'est jamais retirée.
+
+La ligne « obtention-valeur » est facultative. Avec elle, la carte d'un personnage pas encore
+obtenu montre où en est le joueur (niveau 4 / 10), le 10 étant lu dans la condition.
+
+Les textes dans messages.yml
+
+Sous « types », le nom du personnage, sa phrase de caractère et ce qu'il faut pour l'obtenir.
+
+  types:
+    ARBRE:
+      nom: Arbre
+      description:
+        - '&7Patient et solide, il a vu'
+        - '&7pousser toute l''île.'
+      obtention-texte: 'Bûcheron niveau {objectif}'
+      progression: ' &8• &7Bûcheron niveau &f{valeur} &8/ &f{objectif}'
+
+{objectif} devient le nombre de la condition : si vous changez 10 en 15 dans config.yml, le texte
+suit tout seul. {valeur} est la valeur du joueur. Sans « progression », la ligne commune
+menu.types.type.progression sert. Une ligne « jake » donne à Jake un autre nom sous ce
+personnage ; sans elle, il s'appelle Jake.
+
+Ses répliques, enfin. Sous « repliques » dans messages.yml, ajoutez une section au nom de son
+caractère (arbre), avec les listes de « defaut » que vous voulez changer (bonjour, visiteur,
+joie...). Une liste absente reprend celle de « defaut ».
+
+Pour finir, tapez /shislandjake reload et ouvrez /jake type : la carte du personnage est là.
+
+
+2. AJOUTER OU CHANGER UNE RÉACTION OU UNE RÉPLIQUE
+--------------------------------------------------
+
+Une réaction est ce que Jake fait pour un joueur : un geste du modèle, une phrase dans une bulle,
+un son, des particules. Les réactions sont dans la section « reactions » de config.yml, et leurs
+phrases dans la section « repliques » de messages.yml. L'en-tête de la section « reactions »
+décrit chaque réglage. Voici une réaction qui félicite le joueur.
+
+  reactions:
+    bravo:
+      animation: joie
+      repliques: bravo
+      son: entity.villager.celebrate
+      particules: HAPPY_VILLAGER 8
+      pause-secondes: 60
+
+Et ses phrases, dans messages.yml (une est tirée au hasard, jamais deux fois de suite la même).
+
+  repliques:
+    defaut:
+      bravo:
+        - 'Bravo, {joueur} !'
+        - 'Quel talent !'
+
+{joueur} est le joueur, {nom} le nom de Jake, {chef} le chef de l'île. Les placeholders sont lus
+pour le joueur. Pour changer une phrase, modifiez la liste, puis /shislandjake reload.
+
+Avec « approche: true », la réaction part aussi quand le joueur arrive près de Jake. Les lignes
+« si » la réservent aux joueurs pour qui les conditions sont vraies.
+
+
+3. FAIRE RÉAGIR JAKE DEPUIS UN AUTRE PLUGIN
+-------------------------------------------
+
+Un autre plugin, un menu ou une quête lance une commande de console.
+
+  /shislandjake react <joueur> <réaction> [texte]
+      joue la réaction pour ce joueur ; le texte, s'il est donné, remplace la réplique.
+  /shislandjake say <joueur> <texte>
+      Jake dit ce texte dans une bulle, à ce joueur seul.
+
+Rien n'est joué si le joueur est loin de tout Jake, a rendu Jake discret, ou si une condition de
+la réaction est fausse ; la commande ne répond rien dans ces cas. Si le joueur a un menu ouvert,
+la réaction attend qu'il le ferme.
+
+
+4. FAIRE PASSER TOUTES LES ÎLES À UN AUTRE PERSONNAGE
+-----------------------------------------------------
+
+Dans config.yml, section « apparences », la liste « remplacements » donne l'ancien identifiant
+puis le nouveau.
+
+  apparences:
+    remplacements:
+      VILLAGER: AVENTURIER
+      WITCH: AVENTURIER
+
+Au rechargement et à chaque démarrage, tous les Jake de ces apparences passent à la nouvelle.
+L'ancienne n'est plus proposée. L'apparence de secours (apparences.secours) peut être remplacée :
+elle reste dans « types » pour dessiner Jake quand un modèle manque, sans jamais être proposée.
+
+
+5. RECHARGER
+------------
+
+  /shislandjake reload        relit config.yml et messages.yml.
+  /bdc reload <modèle>        relit le fichier d'un modèle après un changement.
+  /shislandjake info <joueur> montre le Jake de l'île d'un joueur et ce qui le dessine.
+  /shislandjake stats         montre ce que Jake coûte au serveur sur la dernière minute.

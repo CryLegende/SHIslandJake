@@ -60,6 +60,21 @@ public final class Messages {
         return name == null || name.isEmpty() ? "Jake" : name;
     }
 
+    /** types.<ID>.<cle> : une ligne ou une liste de lignes ; vide si absente. */
+    public List<String> typeLines(String type, String key, String... replacements) {
+        String path = "types." + type + "." + key;
+        if (file.isList(path)) {
+            return lines(path, replacements);
+        }
+        String line = file.getString(path);
+        return line == null || line.isEmpty() ? List.of() : List.of(replace(line, replacements));
+    }
+
+    /** types.<ID>.<cle> : un texte ; vide s'il manque. */
+    public String typeText(String type, String key, String... replacements) {
+        return replace(file.getString("types." + type + "." + key), replacements);
+    }
+
     public static Component chat(String text) {
         return LEGACY.deserialize(text);
     }

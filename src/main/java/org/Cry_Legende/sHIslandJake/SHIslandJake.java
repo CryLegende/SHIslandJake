@@ -56,6 +56,7 @@ public final class SHIslandJake extends JavaPlugin {
         if (!new File(getDataFolder(), "messages.yml").exists()) {
             saveResource("messages.yml", false);
         }
+        poserGuide();
         try {
             settings = new Settings(FichiersConfig.lire(getDataFolder(), "config.yml"), getLogger());
             messages = new Messages(readMessages());
@@ -196,8 +197,16 @@ public final class SHIslandJake extends JavaPlugin {
 
     //RECHARGEMENT----------
 
+    /** Le guide du staff (LISEZ-MOI.txt) est reposé à côté de config.yml s'il manque. */
+    private void poserGuide() {
+        if (!new File(getDataFolder(), "LISEZ-MOI.txt").exists()) {
+            saveResource("LISEZ-MOI.txt", false);
+        }
+    }
+
     /** Relit config.yml (réactions comprises) et messages.yml ; un fichier invalide laisse l'ancienne configuration. */
     void reload(CommandSender sender) {
+        poserGuide();
         Settings newSettings;
         Messages newMessages;
         try {

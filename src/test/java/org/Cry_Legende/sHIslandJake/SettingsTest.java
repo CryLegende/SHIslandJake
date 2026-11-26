@@ -101,13 +101,61 @@ class SettingsTest {
                     WITCH: INEXISTANTE
                 """);
         Remplacements r = ApparencesLues.filtrer(Remplacements.lire(c.getConfigurationSection("apparences.remplacements")),
-                java.util.Set.of("AVENTURIER", "VILLAGER", "WITCH"), avertissements::add);
+                java.util.Set.of("AVENTURIER", "VILLAGER", "WITCH"), "", avertissements::add);
         assertEquals("AVENTURIER", r.appliquer("VILLAGER"));
         // cible absente de « types » : ignorée
         assertEquals("WITCH", r.appliquer("WITCH"));
         assertTrue(avertissements.stream().anyMatch(m -> m.contains("INEXISTANTE")), avertissements.toString());
-        // identifiant remplacé encore choisissable : signalé
+        // identifiant remplacé resté dans « types » sans servir : signalé
         assertTrue(avertissements.stream().anyMatch(m -> m.contains("reste dans « types »")), avertissements.toString());
+    }
+
+    @Test
+    void leSecoursPeutEtreRemplaceSansEtreMontreNiPerdu() throws Exception {
+        List<String> avertissements = new ArrayList<>();
+        YamlConfiguration c = new YamlConfiguration();
+        c.loadFromString("""
+                apparences:
+                  remplacements:
+                    VILLAGER: AVENTURIER
+                    EVOKER: AVENTURIER
+                """);
+        java.util.Set<String> ids = java.util.Set.of("AVENTURIER", "VILLAGER");
+        Remplacements r = ApparencesLues.filtrer(Remplacements.lire(c.getConfigurationSection("apparences.remplacements")),
+                ids, "VILLAGER", avertissements::add);
+        // les Jake passent à l'Aventurier, le secours reste dans « types » sans avertissement
+        assertEquals("AVENTURIER", r.appliquer("VILLAGER"));
+        assertEquals("AVENTURIER", r.appliquer("EVOKER"));
+        assertTrue(avertissements.isEmpty(), avertissements.toString());
+        // un Jake resté VILLAGER (secours caché) ou d'une apparence disparue est dessiné avec jake.type
+        assertEquals("AVENTURIER", ApparencesLues.resolue("villager", ids, "AVENTURIER", "VILLAGER"));
+        assertEquals("AVENTURIER", ApparencesLues.resolue("WITCH", ids, "AVENTURIER", "VILLAGER"));
+        // sans secours nommé, VILLAGER reste une apparence comme les autres
+        assertEquals("VILLAGER", ApparencesLues.resolue("VILLAGER", ids, "AVENTURIER", ""));
+    }
+
+    @Test
+    void obtentionLue() throws Exception {
+        List<String> avertissements = new ArrayList<>();
+        Map<String, ApparencesLues.Brute> types = lire("""
+                types:
+                  ARBRE:
+                    modele: JAKE_arbre
+                    icone: hdb-81626
+                    obtention:
+                      - "%shjobs_player_level_bucheron% >= 10"
+                      - "illisible"
+                    obtention-valeur: " %shjobs_player_level_bucheron% "
+                  AVENTURIER:
+                    modele: JAKE_aventurier
+                """, avertissements);
+        ApparencesLues.Brute a = types.get("ARBRE");
+        assertEquals(List.of("%shjobs_player_level_bucheron% >= 10", "illisible"), a.obtention());
+        assertEquals("%shjobs_player_level_bucheron%", a.obtentionValeur());
+        assertEquals("hdb-81626", a.icone());
+        // une condition illisible est gardée (fausse) et signalée : l'apparence n'est jamais donnée à tous
+        assertTrue(avertissements.stream().anyMatch(m -> m.contains("illisible")), avertissements.toString());
+        assertTrue(types.get("AVENTURIER").obtention().isEmpty());
     }
 
     @Test
@@ -120,5 +168,9 @@ class SettingsTest {
         assertTrue(types.containsKey(c.getString("jake.type")));
         assertTrue(types.containsKey(c.getString("apparences.secours")));
         assertTrue(c.getConfigurationSection("ambiance") != null);
+        // l'Aventurier est le Jake de tout le monde : sans obtention
+        assertEquals("AVENTURIER", c.getString("jake.type"));
+        assertTrue(types.get("AVENTURIER").obtention().isEmpty() && types.get("AVENTURIER").permission().isEmpty());
+        assertEquals(List.of("respire", "respire2"), types.get("AVENTURIER").vie());
     }
 }

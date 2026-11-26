@@ -29,10 +29,12 @@ chat:
   # {type} = nom de l'apparence.
   type-change: '&7&l« &a&lSH &8&l» &7Jake est maintenant &a{type}&7.'
   type-deja: '&7&l« &e&lSH &8&l» &7Jake est déjà &e{type}&7.'
-  # Apparence obtenue mais réservée à d'autres grades (ou, sans apparences.permission-usage, droit manquant).
-  type-reserve: '&7&l« &c&lSH &8&l» &7L''apparence &c{type} &7est réservée aux grades &cVIP&7.'
-  # Apparence pas encore obtenue (avec apparences.permission-usage).
+  # Apparence obtenue, mais son usage est réservé aux grades qui ont apparences.permission-usage.
+  type-reserve: '&7&l« &c&lSH &8&l» &7L''apparence &c{type} &7est réservée aux grades &cVIP &7et plus.'
+  # Apparence pas encore obtenue ; « -comment » quand messages.yml dit ce qu'il faut (types.<ID>.obtention-texte,
+  # {obtention}).
   type-non-obtenue: '&7&l« &c&lSH &8&l» &7Vous n''avez pas encore obtenu l''apparence &c{type}&7.'
+  type-non-obtenue-comment: '&7&l« &c&lSH &8&l» &7Pour obtenir &c{type}&7 : &c{obtention}&7.'
   type-inconnu: '&7&l« &c&lSH &8&l» &7Il n''existe pas d''apparence &c{type}&7.'
   # Apparence remplacée par une autre (config.yml, apparences.remplacements) : elle n'est plus proposée.
   type-remplace: '&7&l« &c&lSH &8&l» &7L''apparence &c{type} &7n''est plus proposée.'
@@ -129,10 +131,17 @@ repliques:
       - 'Bravo, {joueur} !'
       - 'Magnifique !'
 
-# Nom de chaque apparence dans les menus et les messages, et nom de Jake sous cette apparence.
-# Une apparence sans « jake » garde le nom par défaut.
+# Nom de chaque apparence dans les menus et les messages (nom), nom de Jake sous cette apparence (jake, sinon
+# defaut-jake), phrase de caractère de sa carte (description : une ligne ou une liste), ce qu'il faut pour l'obtenir
+# (obtention-texte ; {objectif} = le nombre de sa condition d'obtention) et où en est le joueur (progression ; {valeur}
+# = sa valeur, {objectif} ; sans elle, menu.types.type.progression).
 types:
   defaut-jake: Jake
+  AVENTURIER:
+    nom: Aventurier
+    description:
+      - '&7Toujours une carte en poche'
+      - '&7et une histoire à raconter.'
   VILLAGER:
     nom: Villageois
   EVOKER:
@@ -146,6 +155,49 @@ types:
   WITCH:
     nom: Sorcière
     jake: Jakie
+  # Personnages à venir : décommentez avec leur bloc de config.yml (types).
+  #ARBRE:
+  #  nom: Arbre
+  #  description:
+  #    - '&7Patient et solide, il a vu'
+  #    - '&7pousser toute l''île.'
+  #  obtention-texte: 'Bûcheron niveau {objectif}'
+  #  progression: ' &8• &7Bûcheron niveau &f{valeur} &8/ &f{objectif}'
+  #GOLEM:
+  #  nom: Golem
+  #  description:
+  #    - '&7Un cœur de pierre, et il'
+  #    - '&7ne vous lâche jamais.'
+  #  obtention-texte: 'Mineur niveau {objectif}'
+  #  progression: ' &8• &7Mineur niveau &f{valeur} &8/ &f{objectif}'
+  #EPOUVANTAIL:
+  #  nom: Épouvantail
+  #  description:
+  #    - '&7Il veille sur les champs,'
+  #    - '&7même la nuit.'
+  #  obtention-texte: 'Agriculteur niveau {objectif}'
+  #  progression: ' &8• &7Agriculteur niveau &f{valeur} &8/ &f{objectif}'
+  #CHAT:
+  #  nom: Chat
+  #  description:
+  #    - '&7Curieux de tout, il ne'
+  #    - '&7rate jamais une proie.'
+  #  obtention-texte: 'Chasseur niveau {objectif}'
+  #  progression: ' &8• &7Chasseur niveau &f{valeur} &8/ &f{objectif}'
+  #ETABLI:
+  #  nom: Établi
+  #  description:
+  #    - '&7Il a un outil pour'
+  #    - '&7chaque problème.'
+  #  obtention-texte: 'Artisan niveau {objectif}'
+  #  progression: ' &8• &7Artisan niveau &f{valeur} &8/ &f{objectif}'
+  #LOUTRE:
+  #  nom: Loutre
+  #  description:
+  #    - '&7Toujours mouillée, toujours'
+  #    - '&7de bonne humeur.'
+  #  obtention-texte: 'Pêcheur niveau {objectif}'
+  #  progression: ' &8• &7Pêcheur niveau &f{valeur} &8/ &f{objectif}'
 
 menu:
   principal:
@@ -221,22 +273,44 @@ menu:
         - '&8&l« &fÀ quoi voulez-vous que je ressemble ? &8&l»'
     type:
       nom: '&d{type}'
+      # Lignes d'une carte selon son état. {description} = types.<ID>.description, {obtention} =
+      # types.<ID>.obtention-texte, {progression} = ligne de progression. Une ligne dont le texte manque disparaît,
+      # avec la ligne vide qui la suit.
       actuel:
+        - ''
+        - '{description}'
         - ''
         - ' &d✔ &7C''est {jake} en ce moment'
       disponible:
         - ''
-        - '&8&l« &7{jake} prend cette apparence. &8&l»'
+        - '{description}'
         - ''
         - '&7&o(( &d&oCliquez pour choisir &7&o))'
-      # Pas encore obtenue (avec apparences.permission-usage).
       non-obtenue:
         - ''
+        - '{description}'
+        - ''
         - ' &c✘ &7Pas encore obtenue'
-      # Obtenue, mais réservée à d'autres grades (sans permission-usage : droit de l'apparence manquant).
+        - ' &8• &7Pour l''obtenir : &f{obtention}'
+        - '{progression}'
+      # Obtenue, mais réservée aux grades qui ont apparences.permission-usage.
       reserve:
         - ''
-        - ' &c✘ &7Réservée aux grades &dVIP'
+        - '{description}'
+        - ''
+        - ' &a✔ &7Obtenue'
+        - ' &c✘ &7Réservée aux grades &dVIP &7et plus'
+      # {valeur} = valeur du joueur, {objectif} = nombre à atteindre (types.<ID>.progression le remplace).
+      progression: ' &8• &7Où vous en êtes : &f{valeur} &8/ &f{objectif}'
+    # Flèches, seulement quand les cartes ne tiennent pas sur une page. {page}, {pages}.
+    page-precedente:
+      nom: '&e← Page précédente'
+      description:
+        - '&7Page {page}/{pages}'
+    page-suivante:
+      nom: '&ePage suivante →'
+      description:
+        - '&7Page {page}/{pages}'
     retour:
       nom: '&c⤾ Retour &7(Clic)'
 

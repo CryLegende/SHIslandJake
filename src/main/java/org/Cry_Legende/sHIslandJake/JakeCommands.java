@@ -171,20 +171,31 @@ final class JakeCommands {
 
     /** Vrai si l'apparence a changé. Les droits sont vérifiés ici, au moment du choix. */
     boolean changeType(Player player, Jake jake, Settings.Apparence type) {
+        Settings s = plugin.settings();
         String typeName = plugin.messages().typeName(type.id());
-        if (plugin.settings().remplacee(type.id())) {
-            plugin.sound(player, plugin.settings().soundRefusal);
+        if (s.remplacee(type.id())) {
+            plugin.sound(player, s.soundRefusal);
             plugin.messages().send(player, "type-remplace", "type", typeName);
             return false;
         }
-        if (jake.data().type().equals(type.id())) {
+        if (!s.proposee(type)) {
+            // l'apparence de secours n'est pas proposée
+            plugin.sound(player, s.soundRefusal);
+            plugin.messages().send(player, "type-inconnu", "type", typeName);
+            return false;
+        }
+        if (s.apparence(jake.data().type()).id().equals(type.id())) {
             plugin.messages().send(player, "type-deja", "type", typeName);
             return false;
         }
-        switch (plugin.settings().etat(player, type)) {
+        switch (s.etat(player, type)) {
             case NON_OBTENUE -> {
-                plugin.sound(player, plugin.settings().soundRefusal);
-                plugin.messages().send(player, "type-non-obtenue", "type", typeName);
+                java.util.OptionalDouble but = Obtention.objectif(type.obtention(), type.obtentionValeur());
+                String obtention = plugin.messages().typeText(type.id(), "obtention-texte", "objectif",
+                        but.isPresent() ? Obtention.nombre(but.getAsDouble()) : "");
+                plugin.sound(player, s.soundRefusal);
+                plugin.messages().send(player, obtention.isEmpty() ? "type-non-obtenue" : "type-non-obtenue-comment",
+                        "type", typeName, "obtention", obtention);
                 return false;
             }
             case RESERVE -> {
@@ -290,7 +301,7 @@ final class JakeCommands {
         } else if (args.length == 2 && TYPE.contains(args[0].toLowerCase(Locale.ROOT))
                 && sender.hasPermission("shislandjake.use")) {
             for (Settings.Apparence type : plugin.settings().types.values()) {
-                if (!plugin.settings().remplacee(type.id()) && plugin.settings().etat(sender, type) == Settings.Etat.DISPONIBLE) {
+                if (plugin.settings().proposee(type) && plugin.settings().etat(sender, type) == Settings.Etat.DISPONIBLE) {
                     options.add(type.id().toLowerCase(Locale.ROOT));
                 }
             }

@@ -15,7 +15,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalDouble;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 /**
  * Réglages de Jake (apparence, visibilité, position, Jake discret) et choix de l'apparence. Ouvert et cliqué sur le
@@ -34,17 +36,26 @@ final class JakeMenu implements InventoryHolder {
     /** Commande du bouton retour, gardée quand le menu se rouvre (visibilité, choix du type). */
     private final String back;
     private final Map<Integer, Settings.Apparence> typeSlots = new HashMap<>();
+    /** Page des apparences (à partir de 0) ; flèches montrées seulement s'il y a une page avant ou après. */
+    private int page;
+    private boolean precedente;
+    private boolean suivante;
     private Inventory inventory;
 
-    private JakeMenu(SHIslandJake plugin, Kind kind, UUID island, String back) {
+    private JakeMenu(SHIslandJake plugin, Kind kind, UUID island, String back, int page) {
         this.plugin = plugin;
         this.kind = kind;
         this.island = island;
         this.back = back == null ? "" : back;
+        this.page = Math.max(0, page);
     }
 
     static void open(SHIslandJake plugin, Player player, Kind kind, Jake jake, String back) {
-        JakeMenu menu = new JakeMenu(plugin, kind, jake.island(), back);
+        open(plugin, player, kind, jake, back, 0);
+    }
+
+    static void open(SHIslandJake plugin, Player player, Kind kind, Jake jake, String back, int page) {
+        JakeMenu menu = new JakeMenu(plugin, kind, jake.island(), back, page);
         menu.build(player, jake);
         player.openInventory(menu.inventory);
     }
@@ -61,6 +72,7 @@ final class JakeMenu implements InventoryHolder {
         String name = m.jakeName(d.type());
         String menu = kind == Kind.MAIN ? "menu.principal." : "menu.types.";
         Settings.Frame frame = kind == Kind.MAIN ? s.mainFrame : s.typesFrame;
+        String actuelle = s.apparence(d.type()).id();
         inventory = Bukkit.createInventory(this, frame.size(), Messages.chat(m.text(menu + "titre", "nom", name)));
         if (frame.fill() != null) {
             for (int slot = 0; slot < frame.size(); slot++) {
@@ -71,25 +83,25 @@ final class JakeMenu implements InventoryHolder {
         panes(frame.accent(), frame.accentSlots());
         if (frame.headSlot() >= 0) {
             put(frame.headSlot(), item(Icons.make(frame.headIcon()), m.text(menu + "jake.nom", "nom", name),
-                    m.lines(menu + "jake.description", "nom", name, "type", m.typeName(d.type()))));
+                    m.lines(menu + "jake.description", "nom", name, "type", m.typeName(actuelle))));
         }
         if (kind == Kind.MAIN) {
-            buildMain(player, d, name);
+            buildMain(player, d, name, actuelle);
         } else {
-            buildTypes(player, d);
+            buildTypes(player, actuelle);
         }
     }
 
-    private void buildMain(Player player, JakeData d, String name) {
+    private void buildMain(Player player, JakeData d, String name, String actuelle) {
         Messages m = plugin.messages();
         Settings s = plugin.settings();
         List<String> typeLines = new ArrayList<>();
         boolean otherAllowed = false;
         for (Settings.Apparence type : s.types.values()) {
-            if (s.remplacee(type.id())) {
+            if (!s.proposee(type)) {
                 continue;
             }
-            boolean current = type.id().equals(d.type());
+            boolean current = type.id().equals(actuelle);
             typeLines.add(m.text(current ? "menu.principal.type.ligne-actuel" : "menu.principal.type.ligne",
                     "type", m.typeName(type.id())));
             otherAllowed |= !current && s.etat(player, type) == Settings.Etat.DISPONIBLE;
@@ -107,7 +119,7 @@ final class JakeMenu implements InventoryHolder {
                 lore.add(line);
             }
         }
-        put(s.typeSlot, item(s.apparence(d.type()).icon(), m.text("menu.principal.type.nom", "nom", name), lore));
+        put(s.typeSlot, item(Icons.make(s.apparence(d.type()).icone()), m.text("menu.principal.type.nom", "nom", name), lore));
 
         String state = d.visible() ? "visible" : "cache";
         put(s.visibilitySlot, item(d.visible() ? s.visibleMaterial : s.hiddenMaterial,
@@ -132,39 +144,99 @@ final class JakeMenu implements InventoryHolder {
         }
     }
 
-    /** Une carte par apparence : actuelle, utilisable, pas obtenue, ou obtenue mais réservée à un autre grade. */
-    private void buildTypes(Player player, JakeData d) {
+    /**
+     * Une carte par apparence proposée, dans l'ordre de « types », répartie toute seule dans les lignes du milieu (une
+     * page de plus seulement si elles ne tiennent pas) : actuelle, utilisable, pas obtenue, ou obtenue mais réservée.
+     */
+    private void buildTypes(Player player, String actuelle) {
         Messages m = plugin.messages();
         Settings s = plugin.settings();
-        List<Integer> slots = s.typesSlots;
-        int index = 0;
+        List<Settings.Apparence> cartes = new ArrayList<>();
         for (Settings.Apparence type : s.types.values()) {
-            if (s.remplacee(type.id())) {
-                continue;
+            if (s.proposee(type)) {
+                cartes.add(type);
             }
-            if (index >= slots.size()) {
-                plugin.getLogger().warning("menu.types.cases : pas assez de cases pour toutes les apparences.");
-                break;
-            }
-            int slot = slots.get(index++);
-            String typeName = m.typeName(type.id());
-            String jakeName = m.jakeName(type.id());
-            String state = type.id().equals(d.type()) ? "actuel" : switch (s.etat(player, type)) {
+        }
+        int lignes = s.typesFrame.rows();
+        int pages = DispositionCartes.pages(cartes.size(), lignes);
+        page = Math.min(page, pages - 1);
+        List<Integer> cases = DispositionCartes.cases(cartes.size(), lignes, page);
+        int premiere = page * DispositionCartes.parPage(lignes);
+        UnaryOperator<String> lecteur = Reactions.lecteur(player);
+        for (int i = 0; i < cases.size(); i++) {
+            Settings.Apparence type = cartes.get(premiere + i);
+            String etat = type.id().equals(actuelle) ? "actuel" : switch (s.etat(player, type)) {
                 case DISPONIBLE -> "disponible";
                 case NON_OBTENUE -> "non-obtenue";
                 case RESERVE -> "reserve";
             };
-            ItemStack stack = item(type.icon(), m.text("menu.types.type.nom", "type", typeName, "jake", jakeName),
-                    m.lines("menu.types.type." + state, "type", typeName, "jake", jakeName));
-            if (state.equals("actuel")) {
+            String typeName = m.typeName(type.id());
+            ItemStack stack = item(Icons.make(type.icone()), m.text("menu.types.type.nom", "type", typeName,
+                    "jake", m.jakeName(type.id())), carte(type, etat, lecteur));
+            if (etat.equals("actuel")) {
                 ItemMeta meta = stack.getItemMeta();
                 meta.setEnchantmentGlintOverride(true);
                 stack.setItemMeta(meta);
             }
-            put(slot, stack);
-            typeSlots.put(slot, type);
+            put(cases.get(i), stack);
+            typeSlots.put(cases.get(i), type);
         }
         put(s.typesBackSlot, item(s.typesBackMaterial, m.text("menu.types.retour.nom"), List.of()));
+        precedente = page > 0;
+        suivante = page < pages - 1;
+        String numero = String.valueOf(page + 1);
+        String total = String.valueOf(pages);
+        if (precedente) {
+            put(s.typesPreviousSlot, item(s.typesPageMaterial, m.text("menu.types.page-precedente.nom", "page", numero,
+                    "pages", total), m.lines("menu.types.page-precedente.description", "page", numero, "pages", total)));
+        }
+        if (suivante) {
+            put(s.typesNextSlot, item(s.typesPageMaterial, m.text("menu.types.page-suivante.nom", "page", numero,
+                    "pages", total), m.lines("menu.types.page-suivante.description", "page", numero, "pages", total)));
+        }
+    }
+
+    /**
+     * Lignes d'une carte (menu.types.type.<état>) : {description} = types.<ID>.description, {obtention} =
+     * types.<ID>.obtention-texte, {progression} = où en est le joueur (types.<ID>.obtention-valeur sur le nombre à
+     * atteindre de la condition). Une ligne dont le texte manque disparaît, et la ligne vide qui la suit avec elle.
+     */
+    private List<String> carte(Settings.Apparence type, String etat, UnaryOperator<String> lecteur) {
+        Messages m = plugin.messages();
+        String typeName = m.typeName(type.id());
+        String jakeName = m.jakeName(type.id());
+        OptionalDouble but = Obtention.objectif(type.obtention(), type.obtentionValeur());
+        String objectif = but.isPresent() ? Obtention.nombre(but.getAsDouble()) : "";
+        String obtention = m.typeText(type.id(), "obtention-texte", "objectif", objectif);
+        String progression = "";
+        if (!type.obtentionValeur().isEmpty() && !objectif.isEmpty() && etat.equals("non-obtenue")) {
+            String lu = lecteur.apply(type.obtentionValeur()).trim();
+            OptionalDouble n = Num.parse(lu);
+            String valeur = n.isPresent() ? Obtention.nombre(Math.min(n.getAsDouble(), but.getAsDouble())) : lu;
+            String modele = m.typeText(type.id(), "progression");
+            progression = Messages.replace(modele.isEmpty() ? m.text("menu.types.type.progression") : modele,
+                    "valeur", valeur, "objectif", objectif);
+        }
+        List<String> description = m.typeLines(type.id(), "description", "type", typeName, "jake", jakeName);
+        List<String> out = new ArrayList<>();
+        boolean sauter = false;
+        for (String line : m.lines("menu.types.type." + etat, "type", typeName, "jake", jakeName)) {
+            if (sauter && line.isEmpty()) {
+                sauter = false;
+                continue;
+            }
+            sauter = false;
+            if (line.equals("{description}")) {
+                out.addAll(description);
+                sauter = description.isEmpty();
+            } else if (line.contains("{obtention}") && obtention.isEmpty()
+                    || line.contains("{progression}") && progression.isEmpty()) {
+                sauter = true;
+            } else {
+                out.add(Messages.replace(line, "obtention", obtention, "progression", progression));
+            }
+        }
+        return out;
     }
 
     /** Clic dans le menu (fil principal) : l'île et le Jake sont revérifiés, le menu a pu rester ouvert. */
@@ -197,9 +269,14 @@ final class JakeMenu implements InventoryHolder {
             open(plugin, player, Kind.MAIN, jake, back);
             return;
         }
+        if (precedente && slot == s.typesPreviousSlot || suivante && slot == s.typesNextSlot) {
+            plugin.sound(player, s.soundMenu);
+            open(plugin, player, Kind.TYPES, jake, back, slot == s.typesNextSlot ? page + 1 : page - 1);
+            return;
+        }
         Settings.Apparence type = typeSlots.get(slot);
         if (type != null && plugin.commands().changeType(player, jake, type)) {
-            open(plugin, player, Kind.TYPES, jake, back);
+            open(plugin, player, Kind.TYPES, jake, back, page);
         }
     }
 

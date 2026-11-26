@@ -454,7 +454,7 @@ final class Reactions {
     }
 
     /** Lit les placeholders d'un texte pour ce joueur ; un même texte n'est lu qu'une fois par évaluation. */
-    private UnaryOperator<String> lecteur(Player player) {
+    static UnaryOperator<String> lecteur(Player player) {
         boolean papi = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
         Map<String, String> lus = new HashMap<>(4);
         return text -> !papi || text.indexOf('%') < 0 ? text

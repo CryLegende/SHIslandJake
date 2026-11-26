@@ -57,11 +57,15 @@ Réglages de Jake (`/jake reglages`, accroupi + clic, ou `/jake` quand `jake-san
 
 | Bouton | Effet |
 |---|---|
-| Apparence | Choix parmi les apparences de `types`. Une apparence peut demander un droit d'obtention (`permission`) et, en plus, le droit d'usage `apparences.permission-usage` (grades VIP). Chaque carte dit si elle est utilisable, pas encore obtenue ou réservée à un grade. Le droit se vérifie au moment du choix. |
+| Apparence | Menu Apparence (`/jake type`), voir plus bas. |
 | Visibilité | Cache Jake (et ses textes) à tout le monde, ou le remontre. |
 | Position | Le prochain clic sur un bloc de son île y pose Jake, tourné vers le joueur. |
 | Parole | Jake discret, ou qui parle, pour ce joueur seul. |
 | Retour | Commande `menu.principal.retour-commande` (le guide sur Opale), ou celle de `menu.principal.retours` selon d'où vient le joueur (`/jake reglages <origine>`). |
+
+Le menu Apparence suit la charte des menus de SkyHand (mêmes vitres et même tête que les réglages) : une carte par apparence proposée, dans l'ordre de `types`, centrée dans les lignes du milieu (cinq au plus par ligne), avec une page de plus seulement si les cartes ne tiennent pas. Chaque carte montre l'icône de l'apparence (`types.<ID>.icone` : matériau, `hdb-…` ou `basehead-…`), son nom et sa phrase de caractère (`types.<ID>.description` de `messages.yml`), et son état : actuelle (marquée), utilisable, pas encore obtenue (avec `types.<ID>.obtention-texte` et, si `obtention-valeur` est donnée, où en est le joueur : « niveau 4 / 10 »), ou obtenue mais réservée aux grades VIP et plus. L'apparence de secours nommée dans `apparences.secours` et les apparences remplacées ne sont jamais montrées.
+
+Les apparences s'obtiennent en jouant et ne s'utilisent qu'avec VIP et plus : `types.<ID>.obtention` est une liste de conditions lues pour le joueur (écrites comme les `si` des réactions), au dessin du menu et au moment du choix, avec `types.<ID>.permission` en plus si elle est donnée. Une apparence qui s'obtient demande aussi le droit `apparences.permission-usage` (`shislandjake.personnages`, jamais donné aux op d'office). Une apparence sans obtention (l'Aventurier) est à tout le monde. Une apparence déjà choisie n'est jamais retirée. Un Jake dont l'apparence n'est plus dans `types`, ou qui a l'apparence de secours, est dessiné avec `jake.type`.
 
 ### Performances
 
@@ -97,7 +101,7 @@ Facultatives : `BlockDisplayCreator` (corps « modèle » ; sans lui, le corps d
 
 Le texte donné à `react` ou `say` est pris tel quel (l'appelant lit ses placeholders) ; seuls `{joueur}`, `{nom}` et `{chef}` y sont remplacés. Les répliques de `messages.yml` passent une fois par PlaceholderAPI, avant ces jetons : ce qui vient d'un joueur n'est jamais relu.
 
-`shislandjake.admin` donne toutes les sous-commandes de `/shislandjake`, `shislandjake.bypass` (cliquer sur le Jake de n'importe quelle île), `shislandjake.type.*` et `shislandjake.personnages`. Les droits des apparences sont `op` par défaut : les joueurs les reçoivent par leur groupe. `shislandjake.personnages` est le droit d'usage proposé pour `apparences.permission-usage`.
+`shislandjake.admin` donne toutes les sous-commandes de `/shislandjake`, `shislandjake.bypass` (cliquer sur le Jake de n'importe quelle île) et `shislandjake.type.*`. Les droits des apparences sont `op` par défaut : les joueurs les reçoivent par leur groupe. `shislandjake.personnages` est le droit d'usage de `apparences.permission-usage` : il n'est donné à personne d'office, pas même aux op, il se donne aux grades VIP et plus.
 
 ## Placeholders
 
@@ -111,6 +115,7 @@ Cliquez sur un fichier pour l'ouvrir (valeurs d'exemple) :
 plugins/SHIslandJake/
 ├── <a href="src/main/resources/config.yml">config.yml</a>     place de départ, affichage, textes et bulles, clic, réactions, ambiance, apparences, menus, sons
 ├── <a href="src/main/resources/messages.yml">messages.yml</a>   messages du chat, nom et alerte, format des bulles, répliques, menus, noms des apparences
+├── <a href="src/main/resources/LISEZ-MOI.txt">LISEZ-MOI.txt</a>  guide du staff : ajouter un personnage, une réaction, faire réagir Jake, basculer les îles
 └── jakes.yml       le Jake de chaque île (écrit par le plugin)
 </pre>
 
