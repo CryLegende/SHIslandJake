@@ -82,6 +82,7 @@ final class JakeTracker {
     private BukkitTask visibilityTask;
     private BukkitTask lookTask;
     private BukkitTask forgetTask;
+    private BukkitTask blocksTask;
     private int pass;
     private volatile boolean lookFailureLogged;
 
@@ -106,6 +107,20 @@ final class JakeTracker {
             lookTask = Bukkit.getScheduler().runTaskTimer(plugin, this::turnAll, lookInterval, lookInterval);
         }
         forgetTask = Bukkit.getScheduler().runTaskTimer(plugin, this::forgetIdle, FORGET_SWEEP, FORGET_SWEEP);
+        // blocs au-dessus des Jake vus : un passage par seconde, chaque Jake à son rythme (verification-secondes)
+        blocksTask = Bukkit.getScheduler().runTaskTimer(plugin, this::checkBlocks, 20L, 20L);
+    }
+
+    /** Les Jake qui ont un spectateur et dont la lecture des blocs est due : textes abaissés ou remontés si besoin. */
+    private void checkBlocks() {
+        int tick = Bukkit.getCurrentTick();
+        Set<Jake> vus = new HashSet<>();
+        vues.values().forEach(m -> vus.addAll(m.keySet()));
+        for (Jake jake : vus) {
+            if (jake.corps() != null && tick >= jake.prochainBlocs) {
+                display.blocs(jake, true);
+            }
+        }
     }
 
     /** Arrête le suivi et retire aux joueurs tout ce qu'ils ont reçu en textes et zones (arrêt, rechargement). */
@@ -121,6 +136,10 @@ final class JakeTracker {
         if (forgetTask != null) {
             forgetTask.cancel();
             forgetTask = null;
+        }
+        if (blocksTask != null) {
+            blocksTask.cancel();
+            blocksTask = null;
         }
         for (Map.Entry<UUID, Map<Jake, Textes.Vue>> entry : vues.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());

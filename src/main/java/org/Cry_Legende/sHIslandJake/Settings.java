@@ -94,6 +94,11 @@ public final class Settings {
     public final boolean textShadow;
     public final int lineWidth;
     public final double defaultHeight;
+    /** Textes abaissés sous un bloc qui occupe leur place : hauteur minimale, place des paroles, rythme de lecture. */
+    public final boolean textsUnderBlocks;
+    public final double textsMinHeight;
+    public final double speechSpace;
+    public final int blocksCheckTicks;
 
     public final Integer bubbleBackground;
     public final int bubbleLineWidth;
@@ -268,6 +273,10 @@ public final class Settings {
         textShadow = c.getBoolean("hologramme.ombre-texte", true);
         lineWidth = Math.max(10, c.getInt("hologramme.largeur-ligne", 200));
         defaultHeight = c.getDouble("hologramme.hauteur", 2.1);
+        textsUnderBlocks = c.getBoolean("hologramme.sous-les-blocs.actif", true);
+        textsMinHeight = c.getDouble("hologramme.sous-les-blocs.hauteur-minimale", 1.6);
+        speechSpace = Math.max(0, c.getDouble("hologramme.sous-les-blocs.place-paroles", 0.4));
+        blocksCheckTicks = (int) Math.max(20, Math.round(c.getDouble("hologramme.sous-les-blocs.verification-secondes", 30) * 20));
 
         bubbleBackground = color(c.getString("bulle.fond", "transparent"), "bulle.fond", log);
         bubbleLineWidth = Math.max(10, c.getInt("bulle.largeur-ligne", 150));

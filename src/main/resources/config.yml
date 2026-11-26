@@ -24,6 +24,10 @@
 #  Le plugin garde lui-même ses Jake (jakes.yml) ; ils ne sont dessinés que là
 #  où un joueur passe. Le nom au-dessus de Jake, l'alerte et les bulles sont
 #  envoyés en paquets (packetevents) : chaque joueur reçoit les siens.
+#  Ils descendent sous un feuillage ou un plafond qui occuperait leur place
+#  (hologramme.sous-les-blocs), et une espace devant « ! ? : ; » ou derrière
+#  « y devient insécable à l'affichage : les fichiers gardent des espaces
+#  normales.
 #
 #  Au premier démarrage, les PNJ d'IslandNPC (plugins/IslandNPC/database.db)
 #  sont repris : position, type et visibilité de chaque île.
@@ -150,6 +154,16 @@ hologramme:
   # Hauteur, en blocs, du bas du nom au-dessus des pieds de Jake, pour une
   # apparence sans « hauteur ».
   hauteur: 2.1
+  # Quand un bloc non traversable (feuillage, plafond) occupe la place des textes au-dessus de Jake (nom, alerte,
+  # bulle), les textes descendent pour tenir dessous (leur haut 0,1 bloc sous le bloc), sans passer sous
+  # « hauteur-minimale » (bas du nom au-dessus des pieds) ; sans la place, ils restent à leur hauteur normale.
+  # « place-paroles » : hauteur gardée pour l'alerte ou la bulle au-dessus du décalage d'alerte. Les blocs sont relus
+  # au dessin de Jake, puis toutes les « verification-secondes » quand quelqu'un le voit (un arbre pousse, on construit).
+  sous-les-blocs:
+    actif: true
+    hauteur-minimale: 1.6
+    place-paroles: 0.4
+    verification-secondes: 30
 
 bulle:
   # Bulle de Jake quand il parle à un joueur, au-dessus du nom (à la place de

@@ -128,7 +128,8 @@ final class Textes {
      * tout de suite).
      */
     int bulle(Player joueur, Jake jake, Vue vue, String texte) {
-        List<String> mots = BulleTexte.mots(texte);
+        // « ! », « ? »... ne restent jamais seuls en début de ligne : l'espace devant devient insécable
+        List<String> mots = BulleTexte.mots(Typo.insecables(texte));
         if (mots.isEmpty()) {
             return 0;
         }
@@ -241,9 +242,12 @@ final class Textes {
         return lignes(plugin.messages().text("bulle.format", "texte", partie));
     }
 
-    /** Chaque ligne est lue à part : ses couleurs ne débordent pas sur la suivante. */
+    /**
+     * Chaque ligne est lue à part : ses couleurs ne débordent pas sur la suivante. Les espaces devant « ! ? : ; » et
+     * derrière « deviennent insécables.
+     */
     static Component lignes(String texte) {
-        String[] lignes = texte.split("\n", -1);
+        String[] lignes = Typo.insecables(texte).split("\n", -1);
         List<Component> parts = new ArrayList<>(lignes.length);
         for (String ligne : lignes) {
             parts.add(Messages.chat(ligne));

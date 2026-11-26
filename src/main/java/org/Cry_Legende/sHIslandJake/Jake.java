@@ -25,6 +25,10 @@ final class Jake {
     private Object modele;
     /** Bas du nom au-dessus des pieds, et zone cliquable d'un modèle (0 = pas de zone). */
     private double hauteurTexte;
+    /** Bas du nom sans obstacle au-dessus de Jake (hauteurTexte peut être plus bas, sous un feuillage). */
+    private double hauteurNormale;
+    /** Tick de la prochaine lecture des blocs au-dessus de Jake. */
+    int prochainBlocs;
     private float zoneLargeur;
     private float zoneHauteur;
     private int nomId;
@@ -83,6 +87,7 @@ final class Jake {
         this.corps = corps;
         this.dessinee = apparence;
         this.hauteurTexte = hauteurTexte;
+        this.hauteurNormale = hauteurTexte;
         this.zoneLargeur = zoneLargeur;
         this.zoneHauteur = zoneHauteur;
     }
@@ -131,6 +136,15 @@ final class Jake {
 
     double hauteurTexte() {
         return hauteurTexte;
+    }
+
+    double hauteurNormale() {
+        return hauteurNormale;
+    }
+
+    /** Bas du nom réellement utilisé (abaissé sous un bloc, ou rendu à sa hauteur normale). */
+    void setHauteurTexte(double hauteur) {
+        this.hauteurTexte = hauteur;
     }
 
     boolean aUneZone() {

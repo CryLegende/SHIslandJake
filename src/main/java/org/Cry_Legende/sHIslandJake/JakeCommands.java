@@ -81,6 +81,8 @@ final class JakeCommands {
             plugin.messages().send(sender, "joueurs-seulement");
             return;
         }
+        // toute forme de /jake (et /is jake) ramène d'abord le Jake de l'île s'il manque
+        ramener(player);
         if (sub.isEmpty() && !plugin.settings().noArgCommand.isEmpty()) {
             player.performCommand(plugin.settings().noArgCommand);
         } else if (sub.isEmpty() || MENU.contains(sub)) {
@@ -197,6 +199,18 @@ final class JakeCommands {
         plugin.sound(player, plugin.settings().soundSuccess);
         plugin.messages().send(player, "type-change", "type", typeName);
         return true;
+    }
+
+    /** Le Jake de l'île du joueur, reposé à sa place de départ (avec un message) s'il manque. */
+    private void ramener(Player player) {
+        Island island = plugin.islands().of(player);
+        if (island == null || plugin.registry().get(island.getUniqueId()) != null || !plugin.islands().canUse(player, island, true)) {
+            return;
+        }
+        Jake jake = plugin.manager().create(island);
+        if (jake != null) {
+            plugin.messages().send(player, "jake-revenu", "nom", plugin.messages().jakeName(jake.data().type()));
+        }
     }
 
     /** Lance l'action avec le Jake de l'île du joueur, reposé à sa place de départ s'il avait disparu. */

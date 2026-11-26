@@ -107,6 +107,7 @@ final class JakeDisplay {
                     Settings.Apparence secours = s.secours;
                     if (mob.montrer(jake, secours)) {
                         jake.dessine(mob, secours, Double.isNaN(secours.hauteur()) ? s.defaultHeight : secours.hauteur(), 0f, 0f);
+                        blocs(jake, false);
                         jake.setSecours(true);
                         jake.prochainEssaiModele = tick + s.modelRetryTicks;
                         registry.markDrawn(jake, true);
@@ -118,10 +119,40 @@ final class JakeDisplay {
         }
         if (mob.montrer(jake, a)) {
             jake.dessine(mob, a, Double.isNaN(a.hauteur()) ? s.defaultHeight : a.hauteur(), 0f, 0f);
+            blocs(jake, false);
             registry.markDrawn(jake, true);
             return true;
         }
         return false;
+    }
+
+    /**
+     * Textes sous le bloc qui occupe leur place (feuillage, plafond) : quelques lectures de blocs dans la colonne de
+     * Jake, chunk chargé, fil principal. Au dessin, puis toutes les « verification-secondes » pour un Jake qui a un
+     * spectateur (un arbre pousse, un joueur construit).
+     *
+     * @param renvoyer vrai si les textes déjà envoyés doivent l'être à la nouvelle hauteur
+     */
+    void blocs(Jake jake, boolean renvoyer) {
+        Settings s = plugin.settings();
+        jake.prochainBlocs = Bukkit.getCurrentTick() + s.blocksCheckTicks;
+        double bas = jake.hauteurNormale();
+        Location location = jake.location();
+        if (s.textsUnderBlocks && location != null
+                && location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+            org.bukkit.World world = location.getWorld();
+            int bx = location.getBlockX();
+            int bz = location.getBlockZ();
+            bas = HauteurTextes.bas(location.getY(), jake.hauteurNormale(), s.alertOffset + s.speechSpace, s.textsMinHeight,
+                    y -> !world.getBlockAt(bx, y, bz).isPassable());
+        }
+        if (Math.abs(bas - jake.hauteurTexte()) > 1e-3) {
+            jake.setHauteurTexte(bas);
+            if (renvoyer && tracker != null) {
+                tracker.forgetJake(jake);
+                textes.oublierJake(jake);
+            }
+        }
     }
 
     /** Le modèle est montré : hauteur et zone par défaut, corrigées dès que le moteur donne son dessin. */
@@ -132,6 +163,7 @@ final class JakeDisplay {
         jake.setSecours(false);
         jake.setBornesProvisoires(true);
         bornes(jake);
+        blocs(jake, false);
         jake.prochainControle = tick + s.modelCheckTicks;
         registry.markDrawn(jake, true);
     }
@@ -206,9 +238,10 @@ final class JakeDisplay {
         double zoneHauteur = !Double.isNaN(a.zoneHauteur()) ? a.zoneHauteur() : b[4] * a.taille();
         float l = (float) Math.min(s.maxZoneWidth, Math.max(0.1, largeur));
         float h = (float) Math.max(0.1, zoneHauteur);
-        boolean change = Math.abs(hauteur - jake.hauteurTexte()) > 1e-3 || l != jake.zoneLargeur() || h != jake.zoneHauteur();
+        boolean change = Math.abs(hauteur - jake.hauteurNormale()) > 1e-3 || l != jake.zoneLargeur() || h != jake.zoneHauteur();
         jake.dessine(modele, a, hauteur, l, h);
         jake.setBornesProvisoires(false);
+        blocs(jake, false);
         if (change && tracker != null) {
             // textes et zone renvoyés à la bonne hauteur ; le corps reste
             tracker.forgetJake(jake);
